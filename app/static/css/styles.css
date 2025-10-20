@@ -1,0 +1,410 @@
+/* ========================================
+   VARIABLES CSS
+   ======================================== */
+:root {
+    --primary-color: #2563eb;
+    --primary-dark: #1e40af;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --success-dark: #059669;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #3b82f6;
+    
+    --bg-light: #f8fafc;
+    --bg-gray: #e2e8f0;
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    
+    --border-color: #cbd5e1;
+    --border-light: #e2e8f0;
+    
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.12);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.15);
+    
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-full: 9999px;
+    
+    --transition-fast: 0.2s;
+    --transition-normal: 0.3s;
+}
+
+/* ========================================
+   ESTILOS BASE
+   ======================================== */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-light);
+    min-height: 100vh;
+}
+
+/* ========================================
+   NAVBAR
+   ======================================== */
+.navbar {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    box-shadow: var(--shadow-sm);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.3rem;
+}
+
+/* ========================================
+   LAYOUT
+   ======================================== */
+.content-wrapper {
+    padding: 2rem 0;
+    min-height: calc(100vh - 120px);
+}
+
+.footer {
+    background-color: #1e293b;
+    color: #94a3b8;
+    padding: 1.5rem 0;
+    margin-top: auto;
+}
+
+/* ========================================
+   CARDS
+   ======================================== */
+.card {
+    border: none;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 2px solid var(--border-light);
+    font-weight: 600;
+    padding: 1rem 1.5rem;
+}
+
+/* ========================================
+   BOTONES
+   ======================================== */
+.btn {
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border: none;
+    padding: 0.6rem 1.5rem;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.btn-sm {
+    padding: 0.4rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* ========================================
+   BADGES
+   ======================================== */
+.badge {
+    padding: 0.5rem 0.8rem;
+    font-weight: 500;
+    border-radius: var(--radius-full);
+}
+
+.badge-status {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* ========================================
+   FORMS
+   ======================================== */
+.form-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    padding: 0.75rem 1rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ========================================
+   ALERTS
+   ======================================== */
+.alert {
+    border-radius: var(--radius-sm);
+    border: none;
+}
+
+/* ========================================
+   TABLES
+   ======================================== */
+.table-container {
+    padding: 1.5rem;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--bg-light);
+    border-bottom: 2px solid var(--border-light);
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 1rem 0.75rem;
+    z-index: 10;
+}
+
+.table tbody tr {
+    transition: background-color var(--transition-fast);
+}
+
+.table tbody tr:hover {
+    background-color: var(--bg-light);
+}
+
+.table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+}
+
+/* ========================================
+   BADGES DE TIPO
+   ======================================== */
+.tipo-badge, .tipo-indicator {
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+}
+
+.entrada, .tipo-entrada {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.salida, .tipo-salida {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* ========================================
+   ESTADÍSTICAS
+   ======================================== */
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 2rem;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+.stat-value-large {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* ========================================
+   PROGRESS BAR
+   ======================================== */
+.progress-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 2rem;
+}
+
+.progress {
+    height: 30px;
+    border-radius: 15px;
+}
+
+.progress-bar {
+    font-weight: 600;
+    line-height: 30px;
+}
+
+/* ========================================
+   TABS
+   ======================================== */
+.tabs-container {
+    background: white;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.nav-tabs {
+    border-bottom: none;
+    background-color: var(--bg-light);
+    padding: 0.5rem 1rem 0;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    margin-right: 0.25rem;
+}
+
+.nav-tabs .nav-link:hover {
+    background-color: var(--border-light);
+}
+
+.nav-tabs .nav-link.active {
+    background-color: white;
+    color: var(--primary-color);
+}
+
+/* ========================================
+   MODAL
+   ======================================== */
+.modal-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+}
+
+/* ========================================
+   ESTADOS VACÍOS
+   ======================================== */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* ========================================
+   PAGE HEADERS
+   ======================================== */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3rem 0;
+    margin-bottom: 2rem;
+    border-radius: var(--radius-md);
+}
+
+.section-title {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.section-title i {
+    margin-right: 0.5rem;
+}
+
+/* ========================================
+   INFO ROWS
+   ======================================== */
+.info-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.info-row i {
+    width: 24px;
+    color: var(--text-muted);
+}
+
+.info-label {
+    font-weight: 600;
+    margin-right: 0.5rem;
+    min-width: 120px;
+}
+
+/* ========================================
+   MOVIMIENTO SELECCIONADO
+   ======================================== */
+.movimiento-seleccionado {
+    background-color: #fef3c7 !important;
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+@media (max-width: 768px) {
+    .stat-value {
+        font-size: 2rem;
+    }
+    
+    .page-header {
+        padding: 2rem 1rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .table-container {
+        padding: 1rem;
+    }
+}

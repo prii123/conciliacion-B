@@ -1,0 +1,292 @@
+/* ========================================
+   COMPONENTE: UPLOAD SECTION
+   ======================================== */
+.upload-section {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 3rem;
+    box-shadow: var(--shadow-md);
+}
+
+.upload-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.upload-header h1 {
+    color: var(--text-primary);
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.upload-header p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+/* ========================================
+   COMPONENTE: FILE INPUT
+   ======================================== */
+.file-input-wrapper {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.file-input-label {
+    display: block;
+    padding: 2rem;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    background-color: var(--bg-light);
+}
+
+.file-input-label:hover {
+    border-color: var(--primary-color);
+    background-color: #eff6ff;
+}
+
+.file-input-label i {
+    font-size: 3rem;
+    color: #94a3b8;
+    margin-bottom: 1rem;
+}
+
+.file-input-label.has-file {
+    border-color: var(--success-color);
+    background-color: #f0fdf4;
+}
+
+.file-input-label.has-file i {
+    color: var(--success-color);
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.file-name {
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* ========================================
+   COMPONENTE: INFO CARD
+   ======================================== */
+.info-card {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-left: 4px solid var(--primary-color);
+    padding: 1.5rem;
+    border-radius: var(--radius-sm);
+    margin-top: 2rem;
+}
+
+.info-card h5 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.info-card ul {
+    margin-bottom: 0;
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   COMPONENTE: CONCILIACION CARD
+   ======================================== */
+.conciliacion-card {
+    margin-bottom: 1.5rem;
+    border-left: 4px solid transparent;
+    transition: all var(--transition-normal);
+}
+
+.conciliacion-card.en-proceso {
+    border-left-color: var(--warning-color);
+}
+
+.conciliacion-card.finalizada {
+    border-left-color: var(--success-color);
+}
+
+.conciliacion-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.conciliacion-card .card-body {
+    padding: 1.5rem;
+}
+
+/* ========================================
+   COMPONENTE: ACTION BUTTONS
+   ======================================== */
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-light);
+}
+
+/* ========================================
+   COMPONENTE: MATCH CARD
+   ======================================== */
+.match-card {
+    background: white;
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid transparent;
+    transition: all var(--transition-normal);
+    box-shadow: var(--shadow-sm);
+}
+
+.match-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateX(4px);
+}
+
+.match-card.exacto {
+    border-left-color: var(--success-color);
+}
+
+.match-card.aproximado {
+    border-left-color: var(--warning-color);
+}
+
+.match-card.manual {
+    border-left-color: #6366f1;
+}
+
+.match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.match-badge {
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.badge-exacto {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.badge-aproximado {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.badge-manual {
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
+
+/* ========================================
+   COMPONENTE: MOVIMIENTO DETAIL
+   ======================================== */
+.movimiento-detail {
+    background-color: var(--bg-light);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: 1rem;
+}
+
+.movimiento-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.movimiento-label i {
+    margin-right: 0.5rem;
+}
+
+.detail-row {
+    display: flex;
+    margin-bottom: 0.5rem;
+    color: var(--text-muted);
+}
+
+.detail-label {
+    min-width: 100px;
+    font-weight: 500;
+}
+
+.detail-value {
+    flex: 1;
+    color: var(--text-primary);
+}
+
+/* ========================================
+   COMPONENTE: MATCH PREVIEW
+   ======================================== */
+.match-preview {
+    background-color: var(--bg-light);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    margin: 1rem 0;
+}
+
+/* ========================================
+   COMPONENTE: FILTER SECTION
+   ======================================== */
+.filter-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 2rem;
+}
+
+/* ========================================
+   COMPONENTE: MATCH STATS
+   ======================================== */
+.match-stats {
+    background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-gray) 100%);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    text-align: center;
+}
+
+/* ========================================
+   ANIMACIONES
+   ======================================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}

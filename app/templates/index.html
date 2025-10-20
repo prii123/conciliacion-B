@@ -1,0 +1,163 @@
+
+
+
+
+{% extends "base.html" %}
+{% import "macros.html" as macros %}
+
+{% block title %}Inicio - Cargar Archivos{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="upload-section fade-in">
+            <div class="upload-header">
+                <h1><i class="bi bi-cloud-upload me-2"></i>Nueva Conciliación</h1>
+                <p>Seleccione la empresa y cargue los archivos para iniciar la conciliación</p>
+            </div>
+
+           
+
+            <!-- ================== FORMULARIO DE ARCHIVOS ================== -->
+            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ macros.file_input('banco', 'Archivo del Banco', 'bank') }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ macros.file_input('auxiliar', 'Archivo Auxiliar', 'journal-text') }}
+                    </div>
+                </div>
+
+
+                 <!-- ================== SELECCIÓN DE EMPRESA ================== -->
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-md-8">
+                                <label for="empresa" class="form-label">
+                                    <i class="bi bi-building me-2"></i>Empresa
+                                </label>
+                                <select class="form-select" name="id_empresa" id="id_empresa" required>
+                                    <option value="">Seleccione una empresa</option>
+                                    {% for empresa in empresas %}
+                                        <option value="{{ empresa.id }}">{{ empresa.razon_social }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <!-- <button type="button" class="btn btn-outline-primary mt-3 mt-md-0"  -->
+                                    <!-- <i class="bi bi-building-add me-2"></i>Agregar / Editar Empresa -->
+
+                                    <a href="{{ url_for('nueva_empresa') }}" class="btn btn-primary mt-3">
+                                        <i class="bi bi-plus-circle me-2"></i>Agregar / Editar Empresa
+                                    </a> 
+                                <!-- </button> -->
+                            </div>
+                        </div>
+                    </div>
+                </div>   
+
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <label for="mes" class="form-label">
+                            <i class="bi bi-calendar-month me-2"></i>Mes
+                        </label>
+                        <select class="form-select" name="mes" id="mes" required>
+                            <option value="">Seleccione el mes</option>
+                            {% for mes in ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+                            <option value="{{ mes }}">{{ mes }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="anio" class="form-label">
+                            <i class="bi bi-calendar3 me-2"></i>Año
+                        </label>
+                        <input type="number" class="form-control" name="anio" id="anio" 
+                               min="2020" max="2030" value="2024" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="cuenta" class="form-label">
+                            <i class="bi bi-credit-card me-2"></i>Cuenta
+                        </label>
+                        <input type="text" class="form-control" name="cuenta" id="cuenta" 
+                               placeholder="Ej: Cuenta Corriente 123" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary submit-btn mt-4">
+                    <i class="bi bi-check-circle me-2"></i>Cargar Archivos y Continuar
+                </button>
+            </form>
+
+            <!-- ================== INFO ================== -->
+            <div class="info-card mt-4">
+                <h5><i class="bi bi-info-circle me-2"></i>Formato Requerido</h5>
+                <ul>
+                    <li>Los archivos deben contener las columnas: <strong>fecha</strong>, <strong>descripcion</strong>, <strong>valor</strong>, <strong>es</strong></li>
+                    <li>La columna <strong>fecha</strong> debe estar en formato DD-MM-YYYY</li>
+                    <li>La columna <strong>es</strong> debe contener 'E' (entrada) o 'S' (salida)</li>
+                    <li>Los valores deben ser numéricos (se usará valor absoluto)</li>
+                    <li>Puede descargar una plantilla desde el menú superior</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================== MODAL CREAR / EDITAR EMPRESA ================== -->
+<!-- <div class="modal fade" id="empresaModal" tabindex="-1" aria-labelledby="empresaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="/empresas/nueva" method="post" id="empresaForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="empresaModalLabel">
+                        <i class="bi bi-building me-2"></i>Registrar / Modificar Empresa
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="empresa_id" id="empresa_id">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre de la empresa</label>
+                        <input type="text" class="form-control" name="nombre" id="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nit" class="form-label">NIT</label>
+                        <input type="text" class="form-control" name="nit" id="nit" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="direccion" class="form-label">Dirección</label>
+                        <input type="text" class="form-control" name="direccion" id="direccion">
+                    </div>
+                    <div class="mb-3">
+                        <label for="correo" class="form-label">Correo de contacto</label>
+                        <input type="email" class="form-control" name="correo" id="correo">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-2"></i>Guardar
+                    </button>
+                </div>
+            </form>
+
+            
+        </div>
+    </div>
+</div> -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    FileHandler.init('file_banco', 'label_banco', 'name_banco');
+    FileHandler.init('file_auxiliar', 'label_auxiliar', 'name_auxiliar');
+});
+</script>
+{% endblock %}
+
+

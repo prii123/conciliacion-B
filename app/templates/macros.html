@@ -1,0 +1,338 @@
+{# ========================================
+   MACRO: BADGE DE ESTADO
+   ======================================== #}
+{% macro badge_estado(estado) %}
+    <span class="badge badge-status {% if estado == 'finalizada' %}bg-success{% elif estado == 'en_proceso' %}bg-warning{% else %}bg-secondary{% endif %}">
+        {% if estado == 'finalizada' %}
+            <i class="bi bi-check-circle me-1"></i>Finalizada
+        {% elif estado == 'en_proceso' %}
+            <i class="bi bi-clock-history me-1"></i>En Proceso
+        {% else %}
+            {{ estado }}
+        {% endif %}
+    </span>
+{% endmacro %}
+
+{# ========================================
+   MACRO: BADGE DE TIPO (ENTRADA/SALIDA)
+   ======================================== #}
+{% macro badge_tipo(tipo) %}
+    <span class="tipo-badge {% if tipo == 'E' %}entrada{% else %}salida{% endif %}">
+        {% if tipo == 'E' %}
+            <i class="bi bi-arrow-down-circle me-1"></i>Entrada
+        {% else %}
+            <i class="bi bi-arrow-up-circle me-1"></i>Salida
+        {% endif %}
+    </span>
+{% endmacro %}
+
+{# ========================================
+   MACRO: BADGE DE ORIGEN (BANCO/AUXILIAR)
+   ======================================== #}
+{% macro badge_origen(origen) %}
+    <span class="badge {% if origen == 'banco' %}bg-primary{% else %}bg-info{% endif %}">
+        {{ origen|upper }}
+    </span>
+{% endmacro %}
+
+{# ========================================
+   MACRO: TARJETA DE ESTADÍSTICAS
+   ======================================== #}
+{% macro stats_card(stats) %}
+<div class="stats-card">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.total_movimientos }}</div>
+                <div class="stat-label">Total Movimientos</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.conciliados }}</div>
+                <div class="stat-label">Conciliados</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.no_conciliados }}</div>
+                <div class="stat-label">No Conciliados</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value">{{ "%.1f"|format(stats.porcentaje_conciliacion) }}%</div>
+                <div class="stat-label">Porcentaje</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: BARRA DE PROGRESO
+   ======================================== #}
+{% macro progress_bar(porcentaje, conciliados, total) %}
+<div class="progress-card">
+    <h5 class="mb-3">Progreso de Conciliación</h5>
+    <div class="progress">
+        <div class="progress-bar bg-success" role="progressbar" 
+             style="width: {{ porcentaje }}%"
+             aria-valuenow="{{ porcentaje }}" 
+             aria-valuemin="0" aria-valuemax="100">
+            {{ "%.1f"|format(porcentaje) }}%
+        </div>
+    </div>
+    <div class="mt-3 text-center">
+        <small class="text-muted">
+            {{ conciliados }} de {{ total }} movimientos conciliados
+        </small>
+    </div>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: FILA DE INFORMACIÓN
+   ======================================== #}
+{% macro info_row(icon, label, value) %}
+<div class="info-row">
+    <i class="bi bi-{{ icon }}"></i>
+    <span class="info-label">{{ label }}:</span>
+    <span>{{ value }}</span>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: TABLA DE MOVIMIENTOS
+   ======================================== #}
+{% macro tabla_movimientos(movimientos, tipo, boton_accion=true) %}
+<div class="table-container">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th>Valor</th>
+                <th>Tipo</th>
+                {% if boton_accion %}
+                <th>Acción</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in movimientos %}
+            <tr id="{{ tipo }}_{{ mov.id }}">
+                <td>{{ mov.id }}</td>
+                <td>{{ mov.fecha }}</td>
+                <td>{{ mov.descripcion }}</td>
+                <td>${{ "{:,.2f}".format(mov.valor) }}</td>
+                <td>{{ badge_tipo(mov.es) }}</td>
+                {% if boton_accion %}
+                <td>
+                    {% if tipo == 'banco' %}
+                    <button class="btn btn-sm btn-primary btn-conciliar" 
+                            onclick="MovimientoSelector.seleccionarBanco({{ mov.id }}, '{{ mov.es }}')">
+                        <i class="bi bi-link me-1"></i>Conciliar
+                    </button>
+                    {% else %}
+                    <button class="btn btn-sm btn-success btn-conciliar" 
+                            onclick="MovimientoSelector.seleccionarAuxiliar({{ mov.id }}, '{{ mov.es }}')">
+                        <i class="bi bi-link me-1"></i>Conciliar
+                    </button>
+                    {% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: ESTADO VACÍO
+   ======================================== #}
+<!-- {% macro empty_state(icon, mensaje) %}
+<div class="card">
+    <div class="card-body empty-state">
+        <i class="bi bi-{{ icon }}"></i>
+        <p>{{ mensaje }}</p>
+    </div>
+</div>
+{% endmacro %} -->
+{% macro tabla_movimientos(movimientos, tipo, seleccionable=true) %}
+<div class="table-container">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                {% if seleccionable %}
+                <th style="width: 40px;">
+                    <input type="checkbox" id="chk_all_{{ tipo }}" class="form-check-input"
+                           onclick="MovimientoSelector.seleccionarTodos('{{ tipo }}', this.checked)">
+                </th>
+                {% endif %}
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th>Valor</th>
+                <th>Tipo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in movimientos %}
+            <tr id="{{ tipo }}_{{ mov.id }}">
+                {% if seleccionable %}
+                <td>
+                    <input 
+                        type="checkbox" 
+                        class="form-check-input chk-mov" 
+                        data-id="{{ mov.id }}" 
+                        data-tipo="{{ tipo }}" 
+                        data-es="{{ mov.es }}">
+                </td>
+                {% endif %}
+                <td>{{ mov.id }}</td>
+                <td>{{ mov.fecha }}</td>
+                <td>{{ mov.descripcion }}</td>
+                <td>${{ "{:,.2f}".format(mov.valor) }}</td>
+                <td>{{ badge_tipo(mov.es) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: BOTONES DE ACCIÓN
+   ======================================== #}
+{% macro action_buttons(conciliacion, show_procesar=true) %}
+<div class="action-buttons">
+    <a href="/conciliacion/{{ conciliacion.id }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-eye me-1"></i>Ver Detalle
+    </a>
+    {% if show_procesar and conciliacion.estado == 'en_proceso' %}
+    <button class="btn btn-success btn-sm" onclick="Conciliacion.procesarAutomatica({{ conciliacion.id }})">
+        <i class="bi bi-play-circle me-1"></i>Procesar Automático
+    </button>
+    {% endif %}
+    <a href="/conciliacion/{{ conciliacion.id }}/matches" class="btn btn-info btn-sm text-white">
+        <i class="bi bi-link-45deg me-1"></i>Ver Matches
+    </a>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: CARD DE CONCILIACIÓN
+   ======================================== #}
+{% macro conciliacion_card(conciliacion) %}
+<div class="card conciliacion-card {{ conciliacion.estado }}">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h5 class="mb-1">
+                    <i class="bi bi-bank2 me-2"></i>
+                    Conciliación #{{ conciliacion.id }}
+                </h5>
+                {{ badge_estado(conciliacion.estado) }}
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                {{ info_row('calendar3', 'Fecha Proceso', conciliacion.fecha_proceso) }}
+                {{ info_row('calendar-month', 'Periodo', conciliacion.mes_conciliado ~ ' ' ~ conciliacion.año_conciliado) }}
+                {{ info_row('credit-card', 'Cuenta', conciliacion.cuenta_conciliada) }}
+            </div>
+            <div class="col-md-6">
+                {{ info_row('file-earmark-excel', 'Banco', conciliacion.nombre_archivo_banco) }}
+                {{ info_row('file-earmark-text', 'Auxiliar', conciliacion.nombre_archivo_auxiliar) }}
+            </div>
+        </div>
+        
+        {{ action_buttons(conciliacion) }}
+    </div>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: INPUT DE ARCHIVO
+   ======================================== #}
+{% macro file_input(id, label, icon='file-earmark-excel') %}
+<div class="file-input-wrapper">
+    <label class="form-label">
+        <i class="bi bi-{{ icon }} me-2"></i>{{ label }}
+    </label>
+    <label for="file_{{ id }}" class="file-input-label" id="label_{{ id }}">
+        <i class="bi bi-{{ icon }}"></i>
+        <div>Haga clic o arrastre el archivo aquí</div>
+        <small class="text-muted">Formato: Excel (.xlsx, .xls)</small>
+        <div class="file-name" id="name_{{ id }}"></div>
+    </label>
+    <input type="file" name="file_{{ id }}" id="file_{{ id }}" accept=".xlsx,.xls" required>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: DETALLE DE MOVIMIENTO
+   ======================================== #}
+{% macro movimiento_detail(movimiento, tipo) %}
+<div class="movimiento-detail">
+    <div class="movimiento-label">
+        <i class="bi bi-{% if tipo == 'banco' %}bank2{% else %}journal-text{% endif %}"></i>
+        Movimiento {{ tipo|capitalize }}
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">ID:</span>
+        <span class="detail-value">{{ movimiento.id }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Fecha:</span>
+        <span class="detail-value">{{ movimiento.fecha }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Valor:</span>
+        <span class="detail-value">${{ "{:,.2f}".format(movimiento.valor) }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Tipo:</span>
+        {{ badge_tipo(movimiento.es) }}
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Descripción:</span>
+        <span class="detail-value">{{ movimiento.descripcion }}</span>
+    </div>
+</div>
+{% endmacro %}
+
+{# ========================================
+   MACRO: PAGE HEADER
+   ======================================== #}
+{% macro page_header(title, subtitle, gradient='purple') %}
+<div class="page-header">
+    <div class="container">
+        <h1 class="mb-2">{{ title|safe }}</h1>
+        {% if subtitle %}
+        <p class="mb-0">{{ subtitle }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+
+
+{# ========================================
+   MACRO: BARRA DE PROGRESO EN LÍNEA (FALTANTE)
+   ======================================== #}
+{% macro progress_bar_inline(porcentaje) %}
+    {% set safe_porcentaje = porcentaje|default(0) %}
+    <div class="progress" style="height: 15px; min-width: 100px;">
+        <div class="progress-bar bg-info" role="progressbar" 
+             style="width: {{ safe_porcentaje }}%; font-size: 10px;"
+             aria-valuenow="{{ safe_porcentaje|round(1) }}" 
+             aria-valuemin="0" aria-valuemax="100">
+            {{ "%.1f"|format(safe_porcentaje) }}%
+        </div>
+    </div>
+{% endmacro %}
