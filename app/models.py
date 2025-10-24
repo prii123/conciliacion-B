@@ -41,6 +41,18 @@ class Movimiento(Base):
 
     conciliacion = relationship("Conciliacion", back_populates="movimientos")
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "conciliacion_id": self.conciliacion_id,
+            "fecha": self.fecha,
+            "descripcion": self.descripcion,
+            "valor": self.valor,
+            "es": self.es,
+            "origen": self.origen,
+            "conciliado": self.conciliado,
+        }
+
 class ConciliacionMatch(Base):
     __tablename__ = "conciliacion_matches"
     id = Column(Integer, primary_key=True, index=True)

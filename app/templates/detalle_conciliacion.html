@@ -32,10 +32,12 @@
                     {{ macros.badge_estado(conciliacion.estado) }}
                 </div>
                 <div class="info-row">
-                    <!-- Use JS fetch so the browser does a proper reload instead of showing raw JSON -->
-                    <button type="button" class="btn btn-outline-secondary" onclick="Conciliacion.procesarAutomatica({{ conciliacion.id }})">
-                        <i class="bi bi-arrow-repeat me-2"></i> Procesar conciliación Automaticamente
-                    </button>
+                    <form action="{{ url_for('procesar_conciliacion', conciliacion_id=conciliacion.id) }}"
+                        method="post">
+                        <button type="submit" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-repeat me-2"></i> Procesar conciliación Automaticamente
+                        </button>
+                    </form>
                 </div>
 
                 <div class="col-md-6">
@@ -109,14 +111,14 @@
                     </thead>
                     <tbody>
                         {% for mov in movimientos_conciliados %}
-                            <tr>
-                                <td>{{ mov.id }}</td>
-                                <td>{{ mov.fecha }}</td>
-                                <td>{{ mov.descripcion }}</td>
-                                <td>${{ "{:,.2f}".format(mov.valor|default(0)) }}</td>
-                                <td>{{ macros.badge_tipo(mov.es) }}</td>
-                                <td>{{ macros.badge_origen(mov.origen) }}</td>
-                            </tr>
+                        <tr>
+                            <td>{{ mov.id }}</td>
+                            <td>{{ mov.fecha }}</td>
+                            <td>{{ mov.descripcion }}</td>
+                            <td>${{ "{:,.2f}".format(mov.valor) }}</td>
+                            <td>{{ macros.badge_tipo(mov.es) }}</td>
+                            <td>{{ macros.badge_origen(mov.tipo) }}</td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -160,114 +162,33 @@
 {% block extra_js %}
 
 
-<!-- <script>
-// Datos de movimientos
-const movimientosBancoData = {
-    {% for mov in movimientos_no_conciliados.banco %}
-    {{ mov.id }}: {
-        id: {{ mov.id }},
-        fecha: '{{ mov.fecha }}',
-        descripcion: '{{ mov.descripcion }}',
-        valor: {{ mov.valor }},
-        es: '{{ mov.es }}'
-    }{% if not loop.last %},{% endif %}
-    {% endfor %}
-};
-
-const movimientosAuxiliarData = {
-    {% for mov in movimientos_no_conciliados.auxiliar %}
-    {{ mov.id }}: {
-        id: {{ mov.id }},
-        fecha: '{{ mov.fecha }}',
-        descripcion: '{{ mov.descripcion }}',
-        valor: {{ mov.valor }},
-        es: '{{ mov.es }}'
-    }{% if not loop.last %},{% endif %}
-    {% endfor %}
-};
-
-// Inicializar selector de movimientos
-MovimientoSelector.init(movimientosBancoData, movimientosAuxiliarData);
-
-// Función de confirmación
-// function confirmarConciliacion() {
-//     const selecciones = MovimientoSelector.getSelecciones();
-//     Conciliacion.crearManual({{ conciliacion.id }}, selecciones.banco, selecciones.auxiliar);
-// }
-
-function confirmarConciliacion() {
-    const selecciones = MovimientoSelector.getSelecciones(); // debe devolver { banco: [...], auxiliar: [...] }
-
-    // Validaciones mínimas
-    if (!selecciones || !selecciones.banco || !selecciones.auxiliar ||
-        selecciones.banco.length === 0 || selecciones.auxiliar.length === 0) {
-        alert('Seleccione al menos un movimiento de banco y uno auxiliar.');
-        return;
-    }
-
-    const payload = {
-        id_banco: selecciones.banco,
-        id_auxiliar: selecciones.auxiliar
-    };
-
-    fetch(`{{ url_for('conciliar_manual', conciliacion_id=conciliacion.id) }}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(async res => {
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success) {
-            // éxito: cerrar modal y recargar para ver cambios
-            const modalEl = document.getElementById('conciliarModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-            alert(data.mensaje || 'Conciliación creada correctamente.');
-            window.location.reload();
-        } else {
-            const err = data.error || 'Error al crear conciliación manual';
-            alert(err);
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert('Error de red al intentar crear la conciliación.');
-    });
-}
-
-
-</script>  -->
-
-
 <script>
     // =============================
     // DATOS DE MOVIMIENTOS (desde Jinja)
     // =============================
-    const movimientosBancoData = {
+    const movimientosBancoData = {};
     {% for mov in movimientos_no_conciliados.banco %}
-    {{ mov.id }}: {
-        id: {{ mov.id }},
-        fecha: '{{ mov.fecha }}',
-        descripcion: '{{ mov.descripcion }}',
-        valor: {{ mov.valor|default(0) }},
-        es: '{{ mov.es }}'
-    }{% if not loop.last %},{% endif %}
+    movimientosBancoData["{{ mov.id|escape }}"] = {
+        id: "{{ mov.id|escape }}",
+        fecha: "{{ mov.fecha|escape }}",
+        descripcion: "{{ mov.descripcion|escape }}",
+        valor: "{{ mov.valor|default(0) }}",
+        es: "{{ mov.es|escape }}"
+    };
     {% endfor %}
-};
 
-    const movimientosAuxiliarData = {
+    const movimientosAuxiliarData = {};
     {% for mov in movimientos_no_conciliados.auxiliar %}
-    {{ mov.id }}: {
-        id: {{ mov.id }},
-        fecha: '{{ mov.fecha }}',
-        descripcion: '{{ mov.descripcion }}',
-        valor: {{ mov.valor|default(0) }},
-        es: '{{ mov.es }}'
-    }{% if not loop.last %},{% endif %}
+    movimientosAuxiliarData["{{ mov.id|escape }}"] = {
+        id: "{{ mov.id|escape }}",
+        fecha: "{{ mov.fecha|escape }}",
+        descripcion: "{{ mov.descripcion|escape }}",
+        valor: "{{ mov.valor|default(0) }}",
+        es: "{{ mov.es|escape }}"
+    };
     {% endfor %}
-};
 
-    const conciliacionId = {{ conciliacion.id }};
+    const conciliacionId = "{{ conciliacion.id|escape }}";
 
     // =============================
     // ESTADO DE SELECCIÓN
@@ -289,7 +210,8 @@ function confirmarConciliacion() {
     document.getElementById('btnOkBanco').addEventListener('click', () => {
         const selecciones = MovimientoSelector.getSelecciones();
         const seleccionadosBanco = selecciones.banco;
-
+        console.log( 'boton ir a auxiliar');
+        console.log(seleccionadosBanco);
         if (!seleccionadosBanco || seleccionadosBanco.length === 0) {
             alert('Seleccione al menos un movimiento de banco.');
             return;

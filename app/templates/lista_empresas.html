@@ -8,7 +8,7 @@
         <div class="header-section fade-in">
             <h1><i class="bi bi-building me-2"></i>Gestión de Empresas</h1>
             <p>Administre las empresas y sus conciliaciones bancarias.</p>
-            <a href="{{ url_for('nueva_empresa') }}" class="btn btn-primary mt-3">
+            <a href="/empresas/nueva" class="btn btn-primary mt-3">
                 <i class="bi bi-plus-circle me-2"></i>Nueva Empresa
             </a>
         </div>
@@ -44,12 +44,12 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('conciliaciones_empresas', empresa_id=empresa.id) }}"
-                                        class="btn btn-sm btn-outline-primary" title="Ver Conciliaciones">
+                                    <a href="/empresas/{{ empresa.id }}/conciliaciones" class="btn btn-sm btn-outline-primary"
+                                        title="Ver Conciliaciones">
                                         <i class="bi bi-file-earmark-text"></i> Conciliaciones
                                     </a>
-                                    <a href="{{ url_for('root') }}?empresa_id={{ empresa.id }}"
-                                        class="btn btn-sm btn-outline-success" title="Nueva Conciliación">
+                                    <a href="/root?empresa_id={{ empresa.id }}" class="btn btn-sm btn-outline-success"
+                                        title="Nueva Conciliación">
                                         <i class="bi bi-plus"></i> Nueva
                                     </a>
                                 </td>
@@ -68,4 +68,5 @@
         </div>
     </div>
 </div>
+<script src="/static/js/empresas.js"></script>
 {% endblock %}

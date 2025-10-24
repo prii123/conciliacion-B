@@ -3,8 +3,10 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+from typing import List, Dict, Any
 from ..database import get_db
 from ..models import Empresa, Conciliacion
+from ..schemas import EmpresaSchema, ConciliacionSchema
 
 router = APIRouter()
 # Use absolute templates directory inside the app package
@@ -40,8 +42,8 @@ def nueva_empresa_post(request: Request, nit: str = Form(...), razon_social: str
 def conciliaciones_empresa(request: Request, empresa_id: int, db: Session = Depends(get_db)):
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
-        return RedirectResponse(url="/empresas")
+        return templates.TemplateResponse("lista_empresas.html", {"request": request, "error": "Empresa no encontrada"})
     conciliaciones = db.query(Conciliacion).filter(Conciliacion.id_empresa == empresa_id).order_by(Conciliacion.id.desc()).all()
-    en_proceso = [c for c in conciliaciones if c.estado == 'en_proceso']
-    finalizadas = [c for c in conciliaciones if c.estado == 'finalizada']
+    en_proceso = [ConciliacionSchema.from_orm(c) for c in conciliaciones if c.estado == 'en_proceso']
+    finalizadas = [ConciliacionSchema.from_orm(c) for c in conciliaciones if c.estado == 'finalizada']
     return templates.TemplateResponse("conciliaciones_empresa.html", {"request": request, "empresa": empresa, "en_proceso": en_proceso, "finalizadas": finalizadas})

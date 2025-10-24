@@ -283,110 +283,6 @@ const Conciliacion = {
     }
 };
 
-// ========================================
-// MANEJO DE MOVIMIENTOS
-// ========================================
-
-// const MovimientoSelector = {
-//     movimientosBanco: {},
-//     movimientosAuxiliar: {},
-//     seleccionBanco: null,
-//     seleccionAuxiliar: null,
-
-//     /**
-//      * Inicializa el selector de movimientos
-//      */
-//     init(bancoData, auxiliarData) {
-//         this.movimientosBanco = bancoData;
-//         this.movimientosAuxiliar = auxiliarData;
-//     },
-
-//     /**
-//      * Selecciona un movimiento del banco
-//      */
-//     seleccionarBanco(id, tipo) {
-//         if (this.seleccionAuxiliar && this.movimientosAuxiliar[this.seleccionAuxiliar].es === tipo) {
-//             this.mostrarModal(id, this.seleccionAuxiliar);
-//         } else {
-//             this.seleccionBanco = id;
-//             this.limpiarSeleccion('banco');
-//             document.getElementById('banco_' + id)?.classList.add('movimiento-seleccionado');
-//             Utils.showToast('Seleccione un movimiento auxiliar del mismo tipo', 'info');
-//             document.getElementById('auxiliar-tab')?.click();
-//         }
-//     },
-
-//     /**
-//      * Selecciona un movimiento auxiliar
-//      */
-//     seleccionarAuxiliar(id, tipo) {
-//         if (this.seleccionBanco && this.movimientosBanco[this.seleccionBanco].es === tipo) {
-//             this.mostrarModal(this.seleccionBanco, id);
-//         } else {
-//             this.seleccionAuxiliar = id;
-//             this.limpiarSeleccion('auxiliar');
-//             document.getElementById('auxiliar_' + id)?.classList.add('movimiento-seleccionado');
-//             Utils.showToast('Seleccione un movimiento de banco del mismo tipo', 'info');
-//             document.getElementById('banco-tab')?.click();
-//         }
-//     },
-
-//     /**
-//      * Limpia las selecciones
-//      */
-//     limpiarSeleccion(tipo) {
-//         document.querySelectorAll(`[id^="${tipo}_"]`).forEach(tr => {
-//             tr.classList.remove('movimiento-seleccionado');
-//         });
-//     },
-
-//     /**
-//      * Muestra el modal de confirmación
-//      */
-//     mostrarModal(idBanco, idAuxiliar) {
-//         this.seleccionBanco = idBanco;
-//         this.seleccionAuxiliar = idAuxiliar;
-        
-//         const movBanco = this.movimientosBanco[idBanco];
-//         const movAux = this.movimientosAuxiliar[idAuxiliar];
-        
-//         const diferencia = Math.abs(movBanco.valor - movAux.valor);
-        
-//         const previewHtml = `
-//             <div class="row">
-//                 <div class="col-6">
-//                     <strong>Banco:</strong><br>
-//                     Fecha: ${movBanco.fecha}<br>
-//                     Valor: ${Utils.formatCurrency(movBanco.valor)}<br>
-//                     Descripción: ${movBanco.descripcion}
-//                 </div>
-//                 <div class="col-6">
-//                     <strong>Auxiliar:</strong><br>
-//                     Fecha: ${movAux.fecha}<br>
-//                     Valor: ${Utils.formatCurrency(movAux.valor)}<br>
-//                     Descripción: ${movAux.descripcion}
-//                 </div>
-//             </div>
-//             <div class="mt-3">
-//                 <strong>Diferencia:</strong> ${Utils.formatCurrency(diferencia)}
-//             </div>
-//         `;
-        
-//         document.getElementById('preview-content').innerHTML = previewHtml;
-//         const modal = new bootstrap.Modal(document.getElementById('conciliarModal'));
-//         modal.show();
-//     },
-
-//     /**
-//      * Obtiene las selecciones actuales
-//      */
-//     getSelecciones() {
-//         return {
-//             banco: this.seleccionBanco,
-//             auxiliar: this.seleccionAuxiliar
-//         };
-//     }
-// };
 
 // ========================================
 // FILTROS
@@ -470,11 +366,19 @@ document.addEventListener('change', e => {
   }
 });
 
+// Verificar que el elemento existe antes de agregar un addEventListener
+const element = document.getElementById('some-element-id'); // Reemplazar con el ID correcto
+if (element) {
+    element.addEventListener('click', () => {
+        console.log('Elemento clickeado');
+    });
+} else {
+    console.warn('El elemento con ID "some-element-id" no existe en el DOM.');
+}
 
-
-
-
-
+// ========================================
+// EXPORTAR OBJETOS GLOBALES
+// ========================================
 
 // Exportar para uso global
 window.Utils = Utils;

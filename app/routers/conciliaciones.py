@@ -4,9 +4,11 @@ from sqlalchemy.orm import Session
 from typing import List
 import io, pandas as pd
 from ..database import get_db
-from ..models import Conciliacion, Movimiento, ConciliacionMatch
+from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
 
 router = APIRouter()
 package_dir = Path(__file__).resolve().parent.parent
@@ -14,16 +16,13 @@ templates_dir = package_dir / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
 @router.get("/conciliaciones")
-def lista_conciliaciones(request: Request, db: Session = Depends(get_db)):
-    # Query conciliaciones and group them by empresa name into 'en_proceso' and 'finalizadas'
+def lista_conciliaciones_json(db: Session = Depends(get_db)):
     conciliaciones = db.query(Conciliacion).order_by(Conciliacion.id.desc()).all()
 
     conciliaciones_por_empresa = {}
     for c in conciliaciones:
-        # get company display name
         empresa = c.empresa.razon_social if c.empresa and c.empresa.razon_social else (c.empresa.nombre_comercial if c.empresa else 'Desconocida')
 
-        # compute stats
         movimientos = db.query(Movimiento).filter(Movimiento.conciliacion_id == c.id).all()
         total = len(movimientos)
         conciliados = db.query(ConciliacionMatch).filter(ConciliacionMatch.conciliacion_id == c.id).count()
@@ -48,7 +47,34 @@ def lista_conciliaciones(request: Request, db: Session = Depends(get_db)):
         else:
             conciliaciones_por_empresa[empresa]['en_proceso'].append(conc_obj)
 
-    return templates.TemplateResponse("lista_conciliaciones.html", {"request": request, "conciliaciones_por_empresa": conciliaciones_por_empresa})
+    return jsonable_encoder(conciliaciones_por_empresa)
+
+
+@router.get("/conciliacion/{conciliacion_id}")
+def detalle_conciliacion_json(conciliacion_id: int, db: Session = Depends(get_db)):
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    movimientos = db.query(Movimiento).filter(Movimiento.conciliacion_id == conciliacion_id).all()
+    movimientos_no_conciliados = {
+        "banco": jsonable_encoder([m for m in movimientos if m.origen == "banco" and m.conciliado == "no"]),
+        "auxiliar": jsonable_encoder([m for m in movimientos if m.origen == "auxiliar" and m.conciliado == "no"]),
+    }
+    movimientos_conciliados = db.query(ConciliacionMatch).filter(ConciliacionMatch.conciliacion_id == conciliacion_id).all()
+
+    total = len(movimientos)
+    conciliados = len(movimientos_conciliados)
+    porcentaje = int((conciliados / total) * 100) if total else 0
+    stats = {"porcentaje_conciliacion": porcentaje, "conciliados": conciliados, "total_movimientos": total}
+
+    return {
+        "conciliacion": jsonable_encoder(conciliacion),
+        "movimientos_no_conciliados": movimientos_no_conciliados,
+        "movimientos_conciliados": jsonable_encoder(movimientos_conciliados),
+        "stats": stats
+    }
+
 
 @router.post("/upload")
 def upload_files(file_banco: UploadFile = File(...),
@@ -86,16 +112,18 @@ def upload_files(file_banco: UploadFile = File(...),
     return RedirectResponse(url=f"/conciliacion/{conciliacion.id}", status_code=303)
 
 @router.get("/conciliacion/{conciliacion_id}")
-def detalle_conciliacion(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
+def detalle_conciliacion(conciliacion_id: int, request: Request, db: Session = Depends(get_db)):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
     movimientos = db.query(Movimiento).filter(Movimiento.conciliacion_id == conciliacion_id).all()
     movimientos_no_conciliados = {
         "banco": [m for m in movimientos if m.origen == "banco" and m.conciliado == "no"],
         "auxiliar": [m for m in movimientos if m.origen == "auxiliar" and m.conciliado == "no"],
     }
     movimientos_conciliados = db.query(ConciliacionMatch).filter(ConciliacionMatch.conciliacion_id == conciliacion_id).all()
+
     total = len(movimientos)
     conciliados = len(movimientos_conciliados)
     porcentaje = int((conciliados / total) * 100) if total else 0
@@ -196,23 +224,32 @@ def terminar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
     db.commit()
     return RedirectResponse(url=f"/conciliacion/{conciliacion_id}", status_code=303)
 
+class ConciliacionManualRequest(BaseModel):
+    id_banco: List[int]
+    id_auxiliar: List[int]
+
 @router.post("/conciliacion/{conciliacion_id}/conciliar-manual")
-def conciliar_manual(conciliacion_id: int, banco_ids: List[int] = Form(...), auxiliar_ids: List[int] = Form(...), db: Session = Depends(get_db)):
+def conciliar_manual(conciliacion_id: int, request: ConciliacionManualRequest, db: Session = Depends(get_db)):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
     if not conciliacion:
         raise HTTPException(404, "Conciliación no encontrada")
 
-    for b_id, a_id in zip(banco_ids, auxiliar_ids):
-        mb = db.query(Movimiento).filter(Movimiento.id == b_id, Movimiento.conciliacion_id==conciliacion_id).first()
-        ma = db.query(Movimiento).filter(Movimiento.id == a_id, Movimiento.conciliacion_id==conciliacion_id).first()
+    for b_id, a_id in zip(request.id_banco, request.id_auxiliar):
+        mb = db.query(Movimiento).filter(Movimiento.id == b_id, Movimiento.conciliacion_id == conciliacion_id).first()
+        ma = db.query(Movimiento).filter(Movimiento.id == a_id, Movimiento.conciliacion_id == conciliacion_id).first()
         if not mb or not ma:
             continue
         mb.conciliado = "si"
         ma.conciliado = "si"
-        match = ConciliacionMatch(conciliacion_id=conciliacion_id, movimiento_banco_id=mb.id, movimiento_auxiliar_id=ma.id, diferencia=abs((mb.valor or 0.0) - (ma.valor or 0.0)))
+        match = ConciliacionMatch(
+            conciliacion_id=conciliacion_id,
+            movimiento_banco_id=mb.id,
+            movimiento_auxiliar_id=ma.id,
+            diferencia=abs((mb.valor or 0.0) - (ma.valor or 0.0))
+        )
         db.add(match)
     db.commit()
-    return RedirectResponse(url=f"/conciliacion/{conciliacion_id}", status_code=303)
+    return {"success": True, "mensaje": "Conciliación manual creada correctamente."}
 
 @router.delete("/conciliacion/match/{match_id}/eliminar")
 def eliminar_match_manual(match_id: int, db: Session = Depends(get_db)):
@@ -223,3 +260,98 @@ def eliminar_match_manual(match_id: int, db: Session = Depends(get_db)):
     db.delete(match)
     db.commit()
     return {"ok": True}
+
+@router.get("/lista_conciliaciones", name="lista_conciliaciones_html")
+def lista_conciliaciones_html(request: Request, db: Session = Depends(get_db)):
+    conciliaciones = db.query(Conciliacion).order_by(Conciliacion.id.desc()).all()
+
+    conciliaciones_por_empresa = {}
+    for c in conciliaciones:
+        empresa = c.empresa.razon_social if c.empresa and c.empresa.razon_social else (c.empresa.nombre_comercial if c.empresa else 'Desconocida')
+
+        movimientos = db.query(Movimiento).filter(Movimiento.conciliacion_id == c.id).all()
+        total = len(movimientos)
+        conciliados = db.query(ConciliacionMatch).filter(ConciliacionMatch.conciliacion_id == c.id).count()
+        porcentaje = int((conciliados / total) * 100) if total else 0
+
+        conc_obj = {
+            'id': c.id,
+            'mes_conciliado': c.mes_conciliado,
+            'año_conciliado': getattr(c, 'anio_conciliado', None) or getattr(c, 'año_conciliado', None) or '',
+            'cuenta_conciliada': c.cuenta_conciliada,
+            'estado': c.estado,
+            'total_movimientos': total,
+            'conciliados': conciliados,
+            'porcentaje_conciliacion': porcentaje,
+        }
+
+        if empresa not in conciliaciones_por_empresa:
+            conciliaciones_por_empresa[empresa] = {'en_proceso': [], 'finalizadas': []}
+
+        if c.estado and c.estado.lower() == 'finalizada':
+            conciliaciones_por_empresa[empresa]['finalizadas'].append(conc_obj)
+        else:
+            conciliaciones_por_empresa[empresa]['en_proceso'].append(conc_obj)
+
+    return templates.TemplateResponse("lista_conciliaciones.html", {"request": request, "conciliaciones_por_empresa": conciliaciones_por_empresa})
+
+@router.get("/detalle_conciliacion/{conciliacion_id}", name="detalle_conciliacion_html")
+def detalle_conciliacion_html(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    movimientos = db.query(Movimiento).filter(Movimiento.conciliacion_id == conciliacion_id).all()
+    movimientos_no_conciliados = {
+        "banco": [m.to_dict() for m in movimientos if m.origen == "banco" and m.conciliado == "no"],
+        "auxiliar": [m.to_dict() for m in movimientos if m.origen == "auxiliar" and m.conciliado == "no"],
+    }
+    movimientos_conciliados = [m.to_dict() for m in movimientos if m.conciliado == "si"]
+
+    total = len(movimientos)
+    conciliados = len(movimientos_conciliados)
+    porcentaje = int((conciliados / total) * 100) if total else 0
+    stats = {"porcentaje_conciliacion": porcentaje, "conciliados": conciliados, "total_movimientos": total}
+
+    return templates.TemplateResponse("detalle_conciliacion.html", {
+        "request": request,
+        "conciliacion": conciliacion,
+        "movimientos_no_conciliados": movimientos_no_conciliados,
+        "movimientos_conciliados": movimientos_conciliados,
+        "stats": stats
+    })
+
+@router.get("/conciliaciones_empresa/{empresa_id}", name="conciliaciones_empresa_html")
+def conciliaciones_empresa_html(request: Request, empresa_id: int, db: Session = Depends(get_db)):
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    conciliaciones = db.query(Conciliacion).filter(Conciliacion.id_empresa == empresa_id).all()
+    en_proceso = [c for c in conciliaciones if c.estado == 'en_proceso']
+    finalizadas = [c for c in conciliaciones if c.estado == 'finalizada']
+
+    return templates.TemplateResponse("conciliaciones_empresa.html", {
+        "request": request,
+        "empresa": empresa,
+        "en_proceso": en_proceso,
+        "finalizadas": finalizadas
+    })
+
+@router.get("/nueva_empresa", name="nueva_empresa_html")
+def nueva_empresa_html(request: Request):
+    return templates.TemplateResponse("nueva_empresa.html", {"request": request})
+
+@router.get("/matches_conciliacion/{conciliacion_id}", name="matches_conciliacion_html")
+def matches_conciliacion_html(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    matches = db.query(ConciliacionMatch).filter(ConciliacionMatch.conciliacion_id == conciliacion_id).all()
+
+    return templates.TemplateResponse("matches_conciliacion.html", {
+        "request": request,
+        "conciliacion": conciliacion,
+        "matches": matches
+    })
