@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="mb-4">
-    <a href="/conciliaciones" class="btn btn-outline-secondary">
+    <a href="/lista_conciliaciones" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-2"></i>Volver a Lista
     </a>
 </div>
@@ -32,7 +32,7 @@
                     {{ macros.badge_estado(conciliacion.estado) }}
                 </div>
                 <div class="info-row">
-                    <form action="{{ url_for('procesar_conciliacion', conciliacion_id=conciliacion.id) }}"
+                    <form action="{{ url_for('procesar_conciliacion', conciliacion_id=conciliacion.id) }}" 
                         method="post">
                         <button type="submit" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-repeat me-2"></i> Procesar conciliación Automaticamente
@@ -58,6 +58,12 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="mb-4">
+    <a href="/matches_conciliacion/{{ conciliacion.id }}" class="btn btn-primary">
+        <i class="bi bi-link-45deg me-2"></i> Ver Matches de Conciliación
+    </a>
 </div>
 
 <div class="tabs-container">
@@ -127,35 +133,6 @@
     </div>
 </div>
 
-<!-- Modal de Conciliación -->
-<!-- <div class="modal fade" id="conciliarModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Conciliación Manual</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="match-preview">
-                    <h6 class="mb-3">Movimientos a Conciliar:</h6>
-                    <div id="preview-content"></div>
-                </div>
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle me-2"></i>
-                    Los movimientos deben ser del mismo tipo (Entrada o Salida)
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="confirmarConciliacion()">
-                    <i class="bi bi-check-circle me-2"></i>Confirmar Conciliación
-                </button>
-            </div>
-        </div>
-    </div>
-</div> -->
-
-
 
 {% endblock %}
 
@@ -167,7 +144,7 @@
     // DATOS DE MOVIMIENTOS (desde Jinja)
     // =============================
     const movimientosBancoData = {};
-    {% for mov in movimientos_no_conciliados.banco %}
+    {% for mov in movimientos_no_conciliados.banco|default([]) %}
     movimientosBancoData["{{ mov.id|escape }}"] = {
         id: "{{ mov.id|escape }}",
         fecha: "{{ mov.fecha|escape }}",
@@ -178,7 +155,7 @@
     {% endfor %}
 
     const movimientosAuxiliarData = {};
-    {% for mov in movimientos_no_conciliados.auxiliar %}
+    {% for mov in movimientos_no_conciliados.auxiliar|default([]) %}
     movimientosAuxiliarData["{{ mov.id|escape }}"] = {
         id: "{{ mov.id|escape }}",
         fecha: "{{ mov.fecha|escape }}",

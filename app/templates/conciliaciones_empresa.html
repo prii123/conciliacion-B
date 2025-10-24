@@ -38,7 +38,7 @@
                             <td>{{ c.año_conciliado }}</td>
                             <td>{{ c.cuenta_conciliada }}</td>
                             <td>
-                                <a href="{{ url_for('detalle_conciliacion', conciliacion_id=c.id) }}" 
+                                <a href="/detalle_conciliacion/{{ c.id }}"  
                                    class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye"></i> Ver Detalle
                                 </a>

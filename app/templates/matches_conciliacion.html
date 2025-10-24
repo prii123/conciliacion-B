@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="mb-4">
-    <a href="/conciliacion/{{ conciliacion.id }}" class="btn btn-outline-secondary">
+    <a href="/detalle_conciliacion/{{ conciliacion.id }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-2"></i>Volver al Detalle
     </a>
 </div>
@@ -22,7 +22,7 @@
     <div class="col-md-4">
         <div class="match-stats">
             <div class="stat-value-large">
-                {{ matches|selectattr('match.criterio_match', 'contains', 'exacto')|list|length }}
+                {{ matches|selectattr('diferencia', 'equalto', 0.0)|list|length }}
             </div>
             <div class="text-muted">Exactos</div>
         </div>
@@ -30,7 +30,7 @@
     <div class="col-md-4">
         <div class="match-stats">
             <div class="stat-value-large">
-                {{ matches|selectattr('match.criterio_match', 'contains', 'manual')|list|length }}
+                {{ matches|selectattr('diferencia', 'ne', 0.0)|list|length }}
             </div>
             <div class="text-muted">Manuales</div>
         </div>
@@ -56,28 +56,26 @@
 {% if matches %}
     <div id="matchesContainer">
         {% for item in matches %}
-        <div class="match-card {{ 'exacto' if 'exacto' in item.match.criterio_match else ('manual' if 'manual' in item.match.criterio_match else 'aproximado') }}" 
-             data-criterio="{{ item.match.criterio_match }}">
+        <div class="match-card {{ 'exacto' if item.diferencia == 0.0 else 'manual' }}" 
+             data-id="{{ item.id }}">
             <div class="match-header">
                 <div>
                     <h5 class="mb-2">
-                        Match #{{ item.match.id }}
-                        <span class="match-badge {{ 'badge-exacto' if 'exacto' in item.match.criterio_match else ('badge-manual' if 'manual' in item.match.criterio_match else 'badge-aproximado') }}">
-                            {% if 'exacto' in item.match.criterio_match %}
+                        Match #{{ item.id }}
+                        <span class="match-badge {{ 'badge-exacto' if item.diferencia == 0.0 else 'badge-manual' }}">
+                            {% if item.diferencia == 0.0 %}
                                 <i class="bi bi-check-circle me-1"></i>Exacto
-                            {% elif 'manual' in item.match.criterio_match %}
-                                <i class="bi bi-hand-index me-1"></i>Manual
                             {% else %}
-                                <i class="bi bi-diagram-3 me-1"></i>Aproximado
+                                <i class="bi bi-hand-index me-1"></i>Manual
                             {% endif %}
                         </span>
                     </h5>
                     <small class="text-muted">
-                        <i class="bi bi-calendar3 me-1"></i>{{ item.match.fecha_match }}
+                        <i class="bi bi-calendar3 me-1"></i>Fecha no disponible
                     </small>
                 </div>
-                {% if 'manual' in item.match.criterio_match %}
-                <button class="btn btn-danger btn-sm" onclick="Conciliacion.eliminarMatch({{ item.match.id }})">
+                {% if item.diferencia != 0.0 %}
+                <button class="btn btn-danger btn-sm" onclick="Conciliacion.eliminarMatch('{{ item.id }}')">
                     <i class="bi bi-trash me-1"></i>Eliminar
                 </button>
                 {% endif %}
@@ -95,10 +93,10 @@
             <div class="mt-3 p-3 bg-light rounded">
                 <div class="row">
                     <div class="col-md-6">
-                        <strong>Criterio:</strong> {{ item.match.criterio_match }}
+                        <strong>Criterio:</strong> {{ 'Exacto' if item.diferencia == 0.0 else 'Manual' }}
                     </div>
                     <div class="col-md-6">
-                        <strong>Diferencia:</strong> ${{ "{:,.2f}".format(item.match.diferencia_valor) }}
+                        <strong>Diferencia:</strong> ${{ "{:,.2f}".format(item.diferencia) }}
                     </div>
                 </div>
             </div>

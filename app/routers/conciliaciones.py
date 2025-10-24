@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Form, UploadFile, File, Depends, HTTPException
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse, FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
 import io, pandas as pd
@@ -76,40 +76,44 @@ def detalle_conciliacion_json(conciliacion_id: int, db: Session = Depends(get_db
     }
 
 
-@router.post("/upload")
-def upload_files(file_banco: UploadFile = File(...),
+@router.post("/upload", response_class=HTMLResponse)
+def upload_files(request: Request,
+                 file_banco: UploadFile = File(...),
                  file_auxiliar: UploadFile = File(...),
                  mes: str = Form(...),
                  cuenta: str = Form(...),
                  anio: int = Form(...),
                  id_empresa: int = Form(...),
                  db: Session = Depends(get_db)):
-    conciliacion = Conciliacion(id_empresa=id_empresa, mes_conciliado=mes, anio_conciliado=anio, cuenta_conciliada=cuenta)
-    db.add(conciliacion)
-    db.commit()
-    db.refresh(conciliacion)
+    try:
+        conciliacion = Conciliacion(id_empresa=id_empresa, mes_conciliado=mes, anio_conciliado=anio, cuenta_conciliada=cuenta)
+        db.add(conciliacion)
+        db.commit()
+        db.refresh(conciliacion)
 
-    def read_movs(upload, origen_label):
-        upload.file.seek(0)
-        content = upload.file.read()
-        df = pd.read_excel(io.BytesIO(content))
-        rows = []
-        for _, r in df.iterrows():
-            rows.append(Movimiento(
-                conciliacion_id=conciliacion.id,
-                fecha=str(r.get('fecha')),
-                descripcion=str(r.get('descripcion', '')),
-                valor=float(r.get('valor') or 0.0),
-                es=str(r.get('es', '')).upper(),
-                origen=origen_label,
-            ))
-        return rows
+        def read_movs(upload, origen_label):
+            upload.file.seek(0)
+            content = upload.file.read()
+            df = pd.read_excel(io.BytesIO(content))
+            rows = []
+            for _, r in df.iterrows():
+                rows.append(Movimiento(
+                    conciliacion_id=conciliacion.id,
+                    fecha=str(r.get('fecha')),
+                    descripcion=str(r.get('descripcion', '')),
+                    valor=float(r.get('valor') or 0.0),
+                    es=str(r.get('es', '')).upper(),
+                    origen=origen_label,
+                ))
+            return rows
 
-    movimientos = read_movs(file_banco, "banco") + read_movs(file_auxiliar, "auxiliar")
-    db.add_all(movimientos)
-    db.commit()
+        movimientos = read_movs(file_banco, "banco") + read_movs(file_auxiliar, "auxiliar")
+        db.add_all(movimientos)
+        db.commit()
 
-    return RedirectResponse(url=f"/conciliacion/{conciliacion.id}", status_code=303)
+        return templates.TemplateResponse("success.html", {"request": request, "conciliacion_id": conciliacion.id})
+    except Exception as e:
+        return templates.TemplateResponse("error.html", {"request": request, "error_message": str(e)})
 
 @router.get("/conciliacion/{conciliacion_id}")
 def detalle_conciliacion(conciliacion_id: int, request: Request, db: Session = Depends(get_db)):
@@ -149,17 +153,18 @@ def descargar_plantilla():
     return FileResponse(str(candidate), media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename='plantilla_movimientos.xlsx')
 
 
-@router.post("/conciliacion/{conciliacion_id}/procesar")
-def procesar_conciliacion(conciliacion_id: int, request: Request, db: Session = Depends(get_db)):
-    """Procesamiento automático básico: busca matches exactos por valor y tipo (es)
+@router.post("/conciliacion/{conciliacion_id}/procesar", response_class=RedirectResponse)
+def procesar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
+    """
+    Procesa automáticamente una conciliación buscando matches exactos por valor y tipo (E/S).
     Marca movimientos como conciliados y crea registros en ConciliacionMatch.
-    Devuelve estadísticas sencillas utilizadas por la UI.
+    Redirige de vuelta a la vista de detalle de la conciliación.
     """
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
     if not conciliacion:
-        raise HTTPException(404, "Conciliación no encontrada")
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
 
-    # obtener movimientos no conciliados por origen
+    # Obtener movimientos no conciliados por origen
     movimientos_banco = db.query(Movimiento).filter(
         Movimiento.conciliacion_id == conciliacion_id,
         Movimiento.origen == 'banco',
@@ -172,48 +177,25 @@ def procesar_conciliacion(conciliacion_id: int, request: Request, db: Session = 
     ).all()
 
     matches_exactos = 0
-    # simple greedy matching: por igual valor y mismo tipo (es)
+    # Buscar matches exactos por valor y tipo (E/S)
     for mb in list(movimientos_banco):
-        # buscar un auxiliar que coincida exactamente en valor y tipo
-        candidato = None
-        for ma in movimientos_aux:
-            if (ma.es or '').upper() == (mb.es or '').upper() and (ma.valor or 0.0) == (mb.valor or 0.0):
-                candidato = ma
-                break
-
+        candidato = next((ma for ma in movimientos_aux if ma.es == mb.es and ma.valor == mb.valor), None)
         if candidato:
-            # marcar conciliados
             mb.conciliado = 'si'
             candidato.conciliado = 'si'
             match = ConciliacionMatch(
                 conciliacion_id=conciliacion_id,
                 movimiento_banco_id=mb.id,
                 movimiento_auxiliar_id=candidato.id,
-                diferencia=abs((mb.valor or 0.0) - (candidato.valor or 0.0))
+                diferencia=0.0
             )
             db.add(match)
-            # evitar volver a usar el mismo auxiliar
-            try:
-                movimientos_aux.remove(candidato)
-            except ValueError:
-                pass
+            movimientos_aux.remove(candidato)
             matches_exactos += 1
 
     db.commit()
 
-    stats = {
-        'matches_exactos': matches_exactos,
-        'matches_aproximados': 0,
-        'total_matches': matches_exactos
-    }
-
-    # If request came from a normal browser form submit (Accept: text/html), redirect back to detalle page
-    accept = request.headers.get('accept', '')
-    if 'text/html' in accept.lower():
-        return RedirectResponse(url=f"/conciliacion/{conciliacion_id}", status_code=303)
-
-    # Default: return JSON for API/fetch clients
-    return {"success": True, "stats": stats}
+    return RedirectResponse(url=f"/detalle_conciliacion/{conciliacion_id}", status_code=303)
 
 @router.post("/conciliacion/{conciliacion_id}/terminar_conciliacion")
 def terminar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
@@ -222,7 +204,7 @@ def terminar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Conciliación no encontrada")
     conciliacion.estado = "finalizada"
     db.commit()
-    return RedirectResponse(url=f"/conciliacion/{conciliacion_id}", status_code=303)
+    return RedirectResponse(url=f"/detalle_conciliacion/{conciliacion_id}", status_code=303)
 
 class ConciliacionManualRequest(BaseModel):
     id_banco: List[int]
@@ -348,7 +330,20 @@ def matches_conciliacion_html(request: Request, conciliacion_id: int, db: Sessio
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
 
-    matches = db.query(ConciliacionMatch).filter(ConciliacionMatch.conciliacion_id == conciliacion_id).all()
+    movimientos_banco = {mov.id: mov for mov in db.query(Movimiento).filter(Movimiento.origen == 'banco').all()}
+    movimientos_auxiliar = {mov.id: mov for mov in db.query(Movimiento).filter(Movimiento.origen == 'auxiliar').all()}
+
+    matches = [
+        {
+            "id": match.id,
+            "movimiento_banco": movimientos_banco.get(match.movimiento_banco_id),
+            "movimiento_auxiliar": movimientos_auxiliar.get(match.movimiento_auxiliar_id),
+            "diferencia": match.diferencia
+        }
+        for match in db.query(ConciliacionMatch).filter(ConciliacionMatch.conciliacion_id == conciliacion_id).all()
+    ]
+
+    print(matches)
 
     return templates.TemplateResponse("matches_conciliacion.html", {
         "request": request,
