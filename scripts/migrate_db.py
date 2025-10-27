@@ -33,34 +33,49 @@ try:
     CREATE TABLE IF NOT EXISTS conciliaciones_new (
         id INTEGER PRIMARY KEY,
         id_empresa INTEGER NOT NULL,
-        mes_conciliado TEXT,
-        anio_conciliado INTEGER,
-        cuenta_conciliada TEXT,
-        fecha_proceso TEXT,
-        estado TEXT
+        mes_conciliado TEXT NOT NULL,
+        anio_conciliado INTEGER NOT NULL,
+        cuenta_conciliada TEXT NOT NULL,
+        fecha_proceso TEXT NOT NULL,
+        estado TEXT NOT NULL,
+        FOREIGN KEY (id_empresa) REFERENCES empresas (id) ON DELETE CASCADE
     );
     ''')
 
-    # Migrate conciliaciones
-    cur.execute('''
-    INSERT INTO conciliaciones_new (id, id_empresa, mes_conciliado, anio_conciliado, cuenta_conciliada, fecha_proceso, estado)
-    SELECT id, id_empresa, mes_conciliado,
-           COALESCE(CAST(año_conciliado AS INTEGER), anio_conciliado),
-           cuenta_conciliada, fecha_proceso, estado
-    FROM conciliaciones;
-    ''')
+    # Migrate conciliaciones (handle missing 'año_conciliado' column more robustly)
+    try:
+        cur.execute('''
+        INSERT INTO conciliaciones_new (id, id_empresa, mes_conciliado, anio_conciliado, cuenta_conciliada, fecha_proceso, estado)
+        SELECT id, id_empresa, mes_conciliado,
+               CAST(año_conciliado AS INTEGER),
+               cuenta_conciliada, fecha_proceso, estado
+        FROM conciliaciones;
+        ''')
+    except sqlite3.OperationalError as e:
+        if "no such column: año_conciliado" in str(e):
+            print("Column 'año_conciliado' not found. Using default value 0.")
+            cur.execute('''
+            INSERT INTO conciliaciones_new (id, id_empresa, mes_conciliado, anio_conciliado, cuenta_conciliada, fecha_proceso, estado)
+            SELECT id, id_empresa, mes_conciliado,
+                   0,
+                   cuenta_conciliada, fecha_proceso, estado
+            FROM conciliaciones;
+            ''')
+        else:
+            raise
 
     # Create new movimientos table
     cur.execute('''
     CREATE TABLE IF NOT EXISTS movimientos_new (
         id INTEGER PRIMARY KEY,
         conciliacion_id INTEGER NOT NULL,
-        fecha TEXT,
+        fecha TEXT NOT NULL,
         descripcion TEXT,
-        valor REAL,
-        es TEXT,
-        origen TEXT,
-        conciliado TEXT
+        valor REAL NOT NULL,
+        es TEXT NOT NULL,
+        origen TEXT NOT NULL,
+        conciliado TEXT NOT NULL,
+        FOREIGN KEY (conciliacion_id) REFERENCES conciliaciones (id) ON DELETE CASCADE
     );
     ''')
 
@@ -71,22 +86,26 @@ try:
     FROM movimientos;
     ''')
 
-    # Create new empresas table (keep basic columns)
+    # Create new empresas table (updated to include 'email')
     cur.execute('''
     CREATE TABLE IF NOT EXISTS empresas_new (
         id INTEGER PRIMARY KEY,
-        nit TEXT UNIQUE,
-        razon_social TEXT,
+        nit TEXT UNIQUE NOT NULL,
+        razon_social TEXT NOT NULL,
         nombre_comercial TEXT,
+        email TEXT,
+        telefono TEXT,
+        direccion TEXT,
         ciudad TEXT,
-        estado TEXT
+        estado TEXT NOT NULL,
+        fecha_creacion TEXT
     );
     ''')
 
     # Migrate empresas (map available columns)
     cur.execute('''
-    INSERT INTO empresas_new (id, nit, razon_social, nombre_comercial, ciudad, estado)
-    SELECT id, nit, razon_social, nombre_comercial, ciudad, estado
+    INSERT INTO empresas_new (id, nit, razon_social, nombre_comercial, email, telefono, direccion, ciudad, estado, fecha_creacion)
+    SELECT id, nit, razon_social, nombre_comercial, NULL, NULL, NULL, ciudad, estado, fecha_creacion
     FROM empresas;
     ''')
 
@@ -97,7 +116,10 @@ try:
         conciliacion_id INTEGER NOT NULL,
         movimiento_banco_id INTEGER,
         movimiento_auxiliar_id INTEGER,
-        diferencia REAL DEFAULT 0.0
+        diferencia REAL DEFAULT 0.0,
+        FOREIGN KEY (conciliacion_id) REFERENCES conciliaciones (id) ON DELETE CASCADE,
+        FOREIGN KEY (movimiento_banco_id) REFERENCES movimientos (id) ON DELETE SET NULL,
+        FOREIGN KEY (movimiento_auxiliar_id) REFERENCES movimientos (id) ON DELETE SET NULL
     );
     ''')
 
