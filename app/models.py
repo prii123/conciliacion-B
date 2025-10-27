@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Date, Float, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from .database import Base
-from datetime import date
+from datetime import date, datetime
 
 
 class Empresa(Base):
@@ -80,3 +80,27 @@ class ConciliacionMatch(Base):
     conciliacion = relationship("Conciliacion")
     movimiento_banco = relationship("Movimiento", foreign_keys=[id_movimiento_banco])
     movimiento_auxiliar = relationship("Movimiento", foreign_keys=[id_movimiento_auxiliar])
+
+    
+#======================================INTERMEDIOS PARA CONCILIACION MANUALES ==========================
+class ConciliacionManual(Base):
+    __tablename__ = 'conciliaciones_manuales'
+    id = Column(Integer, primary_key=True)
+    id_conciliacion = Column(Integer, ForeignKey('conciliaciones.id'), nullable=False)
+    fecha_creacion = Column(String, default=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    # Relaciones con movimientos
+    movimientos_banco = relationship("Movimiento", secondary="conciliacion_manual_banco")
+    movimientos_auxiliar = relationship("Movimiento", secondary="conciliacion_manual_auxiliar")
+
+class ConciliacionManualBanco(Base):
+    __tablename__ = 'conciliacion_manual_banco'
+    id = Column(Integer, primary_key=True)
+    id_conciliacion_manual = Column(Integer, ForeignKey('conciliaciones_manuales.id'), nullable=False)
+    id_movimiento_banco = Column(Integer, ForeignKey('movimientos.id'), nullable=False)
+
+class ConciliacionManualAuxiliar(Base):
+    __tablename__ = 'conciliacion_manual_auxiliar'
+    id = Column(Integer, primary_key=True)
+    id_conciliacion_manual = Column(Integer, ForeignKey('conciliaciones_manuales.id'), nullable=False)
+    id_movimiento_auxiliar = Column(Integer, ForeignKey('movimientos.id'), nullable=False)

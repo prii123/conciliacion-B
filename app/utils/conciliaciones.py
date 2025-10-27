@@ -1,11 +1,11 @@
-
 import pandas as pd
 import numpy as np
 import re
 from datetime import datetime, timedelta
 from sqlalchemy import and_
+from sqlalchemy.sql import text  # Importar text para consultas SQL sin procesar
 from difflib import SequenceMatcher
-from ..models import Conciliacion, ConciliacionMatch, Movimiento
+from ..models import Conciliacion, ConciliacionMatch, Movimiento, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar
 
 
 
@@ -432,38 +432,26 @@ def realizar_conciliacion_automatica(conciliacion_id, db):
 
 def crear_conciliacion_manual(conciliacion_id, id_banco, id_auxiliar, db):
     """
-    Crea una conciliación manual entre uno o varios movimientos de banco y uno o varios
-    movimientos auxiliares (many-to-many). 
-
-    Args:
-        conciliacion_id: ID de la conciliación
-        id_banco: int o list[int] con IDs de movimientos del banco
-        id_auxiliar: int o list[int] con IDs de movimientos auxiliares
-        db: Sesión de base de datos
-
-    Retorna:
-        dict con el resultado (success, match_ids, diferencia_total, mensaje/error)
+    Actualización: Crear una conciliación manual agrupando movimientos seleccionados.
     """
+    print(f"Creando conciliación manual para conciliación ID {conciliacion_id} con bancos {id_banco} y auxiliares {id_auxiliar}")
     try:
+        # Verificar conexión a la base de datos
+        try:
+            db.execute(text("SELECT 1"))  # Usar text para consultas SQL sin procesar
+            print("Conexión a la base de datos verificada.")
+        except Exception as conn_error:
+            print(f"Error de conexión: {conn_error}")
+            return {
+                'success': False,
+                'error': 'No se pudo conectar a la base de datos.'
+            }
+
         # Normalizar inputs a listas
-        if isinstance(id_banco, (int, str)):
-            bancos_ids = [int(id_banco)]
-        elif isinstance(id_banco, list) or isinstance(id_banco, tuple):
-            bancos_ids = [int(i) for i in id_banco]
-        else:
-            return {'success': False, 'error': 'id_banco inválido'}
+        bancos_ids = [int(i) for i in id_banco] if isinstance(id_banco, (list, tuple)) else [int(id_banco)]
+        aux_ids = [int(i) for i in id_auxiliar] if isinstance(id_auxiliar, (list, tuple)) else [int(id_auxiliar)]
 
-        if isinstance(id_auxiliar, (int, str)):
-            aux_ids = [int(id_auxiliar)]
-        elif isinstance(id_auxiliar, list) or isinstance(id_auxiliar, tuple):
-            aux_ids = [int(i) for i in id_auxiliar]
-        else:
-            return {'success': False, 'error': 'id_auxiliar inválido'}
-
-        if not bancos_ids or not aux_ids:
-            return {'success': False, 'error': 'Debe proporcionar al menos un id_banco y un id_auxiliar'}
-
-        # Obtener movimientos y validar pertenencia a la conciliación y estado
+        # Validar movimientos
         movimientos_banco = db.query(Movimiento).filter(
             and_(
                 Movimiento.id.in_(bancos_ids),
@@ -480,69 +468,41 @@ def crear_conciliacion_manual(conciliacion_id, id_banco, id_auxiliar, db):
             )
         ).all()
 
-        if len(movimientos_banco) != len(bancos_ids):
-            faltantes = set(bancos_ids) - {m.id for m in movimientos_banco}
-            return {'success': False, 'error': f'Movimientos de banco no encontrados o fuera de la conciliación: {faltantes}'}
+        print(f"Movimientos banco encontrados: {[m.id for m in movimientos_banco]}")
+        print(f"Movimientos auxiliar encontrados: {[m.id for m in movimientos_auxiliar]}\n")
 
-        if len(movimientos_auxiliar) != len(aux_ids):
-            faltantes = set(aux_ids) - {m.id for m in movimientos_auxiliar}
-            return {'success': False, 'error': f'Movimientos auxiliar no encontrados o fuera de la conciliación: {faltantes}'}
+        # Crear registro en ConciliacionManual
+        conciliacion_manual = ConciliacionManual(id_conciliacion=conciliacion_id)
+        db.add(conciliacion_manual)
+        db.flush()  # Obtener ID de la conciliación manual
 
-        # Verificar que todos los movimientos estén en estado 'no_conciliado'
-        ya_conciliados = [m.id for m in movimientos_banco + movimientos_auxiliar if m.estado_conciliacion != 'no_conciliado']
-        if ya_conciliados:
-            return {'success': False, 'error': f'Los siguientes movimientos ya están conciliados o en otro estado: {ya_conciliados}'}
-
-        # Verificar que todos los movimientos tengan el mismo tipo E/S
-        tipos_banco = {m.es for m in movimientos_banco}
-        tipos_aux = {m.es for m in movimientos_auxiliar}
-        if len(tipos_banco) != 1 or len(tipos_aux) != 1:
-            return {'success': False, 'error': 'Todos los movimientos dentro de cada grupo deben tener el mismo tipo (E o S)'}
-        if tipos_banco.pop() != tipos_aux.pop():
-            return {'success': False, 'error': 'Los movimientos de banco y auxiliar deben ser del mismo tipo (E o S)'}
-
-        # Calcular diferencias / totales agregados
-        total_banco = sum(float(m.valor) for m in movimientos_banco)
-        total_aux = sum(float(m.valor) for m in movimientos_auxiliar)
-        diferencia_total = abs(total_banco - total_aux)
-
-        # Crear matches pairwise entre todos los elementos seleccionados
-        match_ids = []
-        for mov_b in movimientos_banco:
-            for mov_a in movimientos_auxiliar:
-                match = ConciliacionMatch(
-                    id_conciliacion=conciliacion_id,
-                    id_movimiento_banco=mov_b.id,
-                    id_movimiento_auxiliar=mov_a.id,
-                    fecha_match=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    criterio_match=f'manual_{mov_b.es}',
-                    diferencia_valor=abs(float(mov_b.valor) - float(mov_a.valor))
-                )
-                db.add(match)
-                db.flush()  # para obtener match.id sin hacer commit
-                match_ids.append(match.id)
-
-        # Marcar todos los movimientos como conciliados
-        for m in movimientos_banco + movimientos_auxiliar:
-            m.estado_conciliacion = 'conciliado'
+        # Asociar movimientos a la conciliación manual
+        for mov in movimientos_banco:
+            db.add(ConciliacionManualBanco(id_conciliacion_manual=conciliacion_manual.id, id_movimiento_banco=mov.id))
+            mov.estado_conciliacion = 'conciliado'  # Actualizar estado del movimiento
+        for mov in movimientos_auxiliar:
+            db.add(ConciliacionManualAuxiliar(id_conciliacion_manual=conciliacion_manual.id, id_movimiento_auxiliar=mov.id))
+            mov.estado_conciliacion = 'conciliado'  # Actualizar estado del movimiento
 
         db.commit()
 
         return {
             'success': True,
-            'match_ids': match_ids,
-            'diferencia_total': diferencia_total,
-            'mensaje': f'Conciliación manual creada con {len(match_ids)} registros. Diferencia total: ${diferencia_total:,.2f}'
+            'conciliacion_manual_id': conciliacion_manual.id,
+            'mensaje': f'Conciliación manual creada con éxito (ID: {conciliacion_manual.id}).'
         }
 
     except Exception as e:
         db.rollback()
+        print(f"Error al crear conciliación manual: {str(e)}")
         return {
             'success': False,
             'error': f'Error al crear conciliación manual: {str(e)}'
         }
-# ...existing code...
+    
 
+
+    
 def eliminar_conciliacion_manual(match_id, db):
     """
     Elimina una conciliación manual y libera los movimientos
@@ -600,4 +560,4 @@ def eliminar_conciliacion_manual(match_id, db):
             'success': False,
             'error': f'Error al eliminar conciliación manual: {str(e)}'
         }
-    
+

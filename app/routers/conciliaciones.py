@@ -1,13 +1,13 @@
 from datetime import datetime
 from fastapi import APIRouter, Request, Form, UploadFile, File, Depends, HTTPException
-from fastapi.responses import RedirectResponse, FileResponse, HTMLResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
 import io, pandas as pd
 
 from app.utils.utils import validar_excel
 from ..database import get_db
-from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa
+from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from fastapi.encoders import jsonable_encoder
@@ -287,28 +287,40 @@ def lista_conciliaciones_html(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("lista_conciliaciones.html", {"request": request, "conciliaciones_por_empresa": conciliaciones_por_empresa})
 
 @router.get("/detalle_conciliacion/{conciliacion_id}", name="detalle_conciliacion_html")
-def detalle_conciliacion_html(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
+def detalle_conciliacion_html(conciliacion_id: int, request: Request, db: Session = Depends(get_db)):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
     if not conciliacion:
-        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+        raise HTTPException(404, "Conciliación no encontrada")
 
     movimientos = db.query(Movimiento).filter(Movimiento.id_conciliacion == conciliacion_id).all()
-    movimientos_no_conciliados = {
-        "banco": [m.to_dict() for m in movimientos if m.tipo == "banco" and m.estado_conciliacion == "no_conciliado"],
-        "auxiliar": [m.to_dict() for m in movimientos if m.tipo == "auxiliar" and m.estado_conciliacion == "no_conciliado"],
-    }
-    movimientos_conciliados = [m.to_dict() for m in movimientos if m.estado_conciliacion == "si"]
+    matches = db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == conciliacion_id).all()
 
-    total = len(movimientos)
-    conciliados = len(movimientos_conciliados)
-    porcentaje = int((conciliados / total) * 100) if total else 0
-    stats = {"porcentaje_conciliacion": porcentaje, "conciliados": conciliados, "total_movimientos": total}
+    # Separar movimientos por estado y origen
+    movimientos_no_conciliados = {
+        "banco": [m.to_dict() for m in movimientos if m.estado_conciliacion == "no_conciliado" and m.tipo == "banco"],
+        "auxiliar": [m.to_dict() for m in movimientos if m.estado_conciliacion == "no_conciliado" and m.tipo == "auxiliar"]
+    }
+    movimientos_conciliados = [m.to_dict() for m in movimientos if m.estado_conciliacion == "conciliado"]
+
+    # Calcular estadísticas
+    total_movimientos = len(movimientos)
+    total_conciliados = len(movimientos_conciliados)
+    porcentaje_conciliacion = (total_conciliados / total_movimientos * 100) if total_movimientos > 0 else 0
+
+    stats = {
+        "total_movimientos": total_movimientos,
+        "total_conciliados": total_conciliados,
+        "total_no_conciliados": len(movimientos_no_conciliados["banco"]) + len(movimientos_no_conciliados["auxiliar"]),
+        "total_matches": len(matches),
+        "porcentaje_conciliacion": porcentaje_conciliacion
+    }
 
     return templates.TemplateResponse("detalle_conciliacion.html", {
         "request": request,
         "conciliacion": conciliacion,
         "movimientos_no_conciliados": movimientos_no_conciliados,
         "movimientos_conciliados": movimientos_conciliados,
+        "matches": matches,
         "stats": stats
     })
 
@@ -359,3 +371,41 @@ def matches_conciliacion_html(request: Request, conciliacion_id: int, db: Sessio
         "conciliacion": conciliacion,
         "matches": matches
     })
+
+@router.get("/conciliacion/{conciliacion_id}/matches_y_manuales", name="matches_y_conciliaciones_manuales")
+def obtener_matches_y_conciliaciones_manuales(conciliacion_id: int, db: Session = Depends(get_db)):
+    """
+    Endpoint para obtener los matches y las conciliaciones manuales de una conciliación específica.
+    """
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    # Obtener los movimientos de banco y auxiliar
+    movimientos_banco = {mov.id: mov.to_dict() for mov in db.query(Movimiento).filter(Movimiento.tipo == 'banco').all()}
+    movimientos_auxiliar = {mov.id: mov.to_dict() for mov in db.query(Movimiento).filter(Movimiento.tipo == 'auxiliar').all()}
+
+    # Obtener los matches
+    matches = [
+        {
+            "id": match.id,
+            "movimiento_banco": movimientos_banco.get(match.id_movimiento_banco),
+            "movimiento_auxiliar": movimientos_auxiliar.get(match.id_movimiento_auxiliar),
+            "diferencia": match.diferencia_valor
+        }
+        for match in db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == conciliacion_id).all()
+    ]
+
+    # Obtener las conciliaciones manuales
+    conciliaciones_manuales = db.query(ConciliacionManual).filter(ConciliacionManual.id_conciliacion == conciliacion_id).all()
+    resultado_manuales = [
+        {
+            "id_conciliacion_manual": cm.id,
+            "fecha_creacion": cm.fecha_creacion,
+            "movimientos_banco": [m.to_dict() for m in db.query(Movimiento).join(ConciliacionManualBanco).filter(ConciliacionManualBanco.id_conciliacion_manual == cm.id).all()],
+            "movimientos_auxiliar": [m.to_dict() for m in db.query(Movimiento).join(ConciliacionManualAuxiliar).filter(ConciliacionManualAuxiliar.id_conciliacion_manual == cm.id).all()],
+        }
+        for cm in conciliaciones_manuales
+    ]
+
+    return JSONResponse(content={"matches": matches, "conciliaciones_manuales": resultado_manuales})
