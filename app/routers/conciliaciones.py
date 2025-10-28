@@ -252,6 +252,9 @@ def eliminar_match_manual(match_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
+"""
+genera el endpoint /lista_conciliaciones
+que devuelva en formato HTML la lista de conciliaciones"""
 @router.get("/lista_conciliaciones", name="lista_conciliaciones_html")
 def lista_conciliaciones_html(request: Request, db: Session = Depends(get_db)):
     conciliaciones = db.query(Conciliacion).order_by(Conciliacion.id.desc()).all()
@@ -261,9 +264,13 @@ def lista_conciliaciones_html(request: Request, db: Session = Depends(get_db)):
         empresa = c.empresa.razon_social if c.empresa and c.empresa.razon_social else (c.empresa.nombre_comercial if c.empresa else 'Desconocida')
 
         movimientos = db.query(Movimiento).filter(Movimiento.id_conciliacion == c.id).all()
-        total = len(movimientos)
-        conciliados = db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == c.id).count()
-        porcentaje = int((conciliados / total) * 100) if total else 0
+        total_movimientos = len(movimientos)
+
+        # Filtrar movimientos conciliados directamente
+        movimientos_conciliados = [m for m in movimientos if m.estado_conciliacion == "conciliado"]
+        total_conciliados = len(movimientos_conciliados)
+
+        porcentaje_conciliacion = (total_conciliados / total_movimientos * 100) if total_movimientos > 0 else 0
 
         conc_obj = {
             'id': c.id,
@@ -271,9 +278,9 @@ def lista_conciliaciones_html(request: Request, db: Session = Depends(get_db)):
             'año_conciliado': getattr(c, 'anio_conciliado', None) or getattr(c, 'año_conciliado', None) or '',
             'cuenta_conciliada': c.cuenta_conciliada,
             'estado': c.estado,
-            'total_movimientos': total,
-            'conciliados': conciliados,
-            'porcentaje_conciliacion': porcentaje,
+            'total_movimientos': total_movimientos,
+            'conciliados': total_conciliados,
+            'porcentaje_conciliacion': porcentaje_conciliacion,
         }
 
         if empresa not in conciliaciones_por_empresa:
@@ -286,6 +293,10 @@ def lista_conciliaciones_html(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse("lista_conciliaciones.html", {"request": request, "conciliaciones_por_empresa": conciliaciones_por_empresa})
 
+"""genera el endpoint /detalle_conciliacion/{conciliacion_id}
+que devuelva en formato HTML el detalle de una conciliación específica,
+incluyendo los movimientos no conciliados (separados por banco y auxiliar),
+los movimientos conciliados, y las estadísticas de la conciliación."""
 @router.get("/detalle_conciliacion/{conciliacion_id}", name="detalle_conciliacion_html")
 def detalle_conciliacion_html(conciliacion_id: int, request: Request, db: Session = Depends(get_db)):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
@@ -324,6 +335,11 @@ def detalle_conciliacion_html(conciliacion_id: int, request: Request, db: Sessio
         "stats": stats
     })
 
+"""genera el endpoint /conciliaciones_empresa/{empresa_id}
+que devuelva en formato HTML las
+conciliaciones de una empresa específica, separadas en dos listas:
+- conciliaciones en proceso """
+
 @router.get("/conciliaciones_empresa/{empresa_id}", name="conciliaciones_empresa_html")
 def conciliaciones_empresa_html(request: Request, empresa_id: int, db: Session = Depends(get_db)):
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
@@ -334,6 +350,10 @@ def conciliaciones_empresa_html(request: Request, empresa_id: int, db: Session =
     en_proceso = [c for c in conciliaciones if c.estado == 'en_proceso']
     finalizadas = [c for c in conciliaciones if c.estado == 'finalizada']
 
+    # Log para depuración
+    print("Conciliaciones en proceso:", en_proceso)
+    print("Conciliaciones finalizadas:", finalizadas)
+
     return templates.TemplateResponse("conciliaciones_empresa.html", {
         "request": request,
         "empresa": empresa,
@@ -341,10 +361,20 @@ def conciliaciones_empresa_html(request: Request, empresa_id: int, db: Session =
         "finalizadas": finalizadas
     })
 
+
+"""
+genera el endpoint /nueva_empresa
+que devuelva en formato HTML el formulario para crear una nueva empresa.
+"""
 @router.get("/nueva_empresa", name="nueva_empresa_html")
 def nueva_empresa_html(request: Request):
     return templates.TemplateResponse("nueva_empresa.html", {"request": request})
 
+
+"""
+genera el endpoint /matches_conciliacion/{conciliacion_id}
+que devuelva en formato HTML los matches de una conciliación específica que fueron Automaticos.
+"""
 @router.get("/matches_conciliacion/{conciliacion_id}", name="matches_conciliacion_html")
 def matches_conciliacion_html(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
@@ -372,6 +402,14 @@ def matches_conciliacion_html(request: Request, conciliacion_id: int, db: Sessio
         "matches": matches
     })
 
+
+
+
+
+"""
+genera el endpoint /conciliacion/{conciliacion_id}/matches_y_manuales
+que devuelva en formato JSON los matches y las conciliaciones manuales de una conciliación específica.
+"""
 @router.get("/conciliacion/{conciliacion_id}/matches_y_manuales", name="matches_y_conciliaciones_manuales")
 def obtener_matches_y_conciliaciones_manuales(conciliacion_id: int, db: Session = Depends(get_db)):
     """

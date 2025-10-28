@@ -46,6 +46,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('guia') }}">
+                            <i class="bi bi-book me-1"></i>Guía de Uso
+                        </a>
+                    </li>
+                     <li class="nav-item">
                         <a class="nav-link" href="/descargar_plantilla">
                             <i class="bi bi-download me-1"></i>Descargar Plantilla
                         </a>
@@ -55,7 +60,7 @@
         </div>
     </nav>
 
-    <!-- Contenido Principal -->
+    <!-- Contenido Principal    -->
     <div class="content-wrapper">
         <div class="container">
             {% block content %}{% endblock %}

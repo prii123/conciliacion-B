@@ -43,7 +43,27 @@ def conciliaciones_empresa(request: Request, empresa_id: int, db: Session = Depe
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
         return templates.TemplateResponse("lista_empresas.html", {"request": request, "error": "Empresa no encontrada"})
+
     conciliaciones = db.query(Conciliacion).filter(Conciliacion.id_empresa == empresa_id).order_by(Conciliacion.id.desc()).all()
-    en_proceso = [ConciliacionSchema.from_orm(c) for c in conciliaciones if c.estado == 'en_proceso']
-    finalizadas = [ConciliacionSchema.from_orm(c) for c in conciliaciones if c.estado == 'finalizada']
-    return templates.TemplateResponse("conciliaciones_empresa.html", {"request": request, "empresa": empresa, "en_proceso": en_proceso, "finalizadas": finalizadas})
+    en_proceso = [ConciliacionSchema.from_orm(c).dict() for c in conciliaciones if c.estado == 'en_proceso']
+    finalizadas = [ConciliacionSchema.from_orm(c).dict() for c in conciliaciones if c.estado == 'finalizada']
+
+    # Log para depuración
+    print("Empresa:", empresa)
+    print("Conciliaciones en proceso:", en_proceso)
+    print("Conciliaciones finalizadas:", finalizadas)
+
+    return templates.TemplateResponse("conciliaciones_empresa.html", {
+        "request": request,
+        "empresa": empresa,
+        "en_proceso": en_proceso,
+        "finalizadas": finalizadas
+    })
+
+@router.get("/guia", name="guia")
+def guia(request: Request):
+    return templates.TemplateResponse("guia.html", {"request": request})
+
+
+
+

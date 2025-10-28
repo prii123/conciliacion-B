@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Guía de Uso{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1><i class="bi bi-book me-2"></i>Guía de Uso</h1>
+    <p class="text-muted">Esta página proporciona información sobre cómo utilizar la aplicación.</p>
+
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Introducción</h5>
+        </div>
+        <div class="card-body">
+            <p>Esta aplicación permite gestionar conciliaciones bancarias de manera eficiente. A continuación, se describen las principales funcionalidades:</p>
+            <ul>
+                <li>Gestión de empresas y sus datos básicos.</li>
+                <li>Creación y seguimiento de conciliaciones bancarias.</li>
+                <li>Visualización de conciliaciones en proceso y finalizadas.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Cómo Empezar</h5>
+        </div>
+        <div class="card-body">
+            <ol>
+                <li>Dirígete a la sección de <strong>Empresas</strong> para registrar una nueva empresa.</li>
+                <li>Selecciona una empresa y accede a sus <strong>Conciliaciones</strong>.</li>
+                <li>Crea nuevas conciliaciones y realiza el seguimiento de su estado.</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-warning text-white">
+            <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Notas Importantes</h5>
+        </div>
+        <div class="card-body">
+            <p>Asegúrate de que los datos ingresados sean correctos para evitar errores en las conciliaciones.</p>
+            <p>Si encuentras algún problema, contacta al administrador del sistema.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

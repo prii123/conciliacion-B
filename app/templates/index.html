@@ -105,51 +105,18 @@
                     <li>Puede descargar una plantilla desde el menú superior</li>
                 </ul>
             </div>
+
+            <!-- ================== ENLACE A GUÍA DE USO ================== -->
+            <div class="text-center mt-4">
+                <a href="{{ url_for('guia') }}" class="btn btn-outline-info">
+                    <i class="bi bi-book"></i> Guía de Uso
+                </a>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- ================== MODAL CREAR / EDITAR EMPRESA ================== -->
-<!-- <div class="modal fade" id="empresaModal" tabindex="-1" aria-labelledby="empresaModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form action="/empresas/nueva" method="post" id="empresaForm">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="empresaModalLabel">
-                        <i class="bi bi-building me-2"></i>Registrar / Modificar Empresa
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="empresa_id" id="empresa_id">
-                    <div class="mb-3">
-                        <label for="nombre" class="form-label">Nombre de la empresa</label>
-                        <input type="text" class="form-control" name="nombre" id="nombre" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="nit" class="form-label">NIT</label>
-                        <input type="text" class="form-control" name="nit" id="nit" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="direccion" class="form-label">Dirección</label>
-                        <input type="text" class="form-control" name="direccion" id="direccion">
-                    </div>
-                    <div class="mb-3">
-                        <label for="correo" class="form-label">Correo de contacto</label>
-                        <input type="email" class="form-control" name="correo" id="correo">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save me-2"></i>Guardar
-                    </button>
-                </div>
-            </form>
 
-            
-        </div>
-    </div>
-</div> -->
 {% endblock %}
 
 {% block extra_js %}

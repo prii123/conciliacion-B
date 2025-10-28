@@ -14,8 +14,10 @@ class EmpresaSchema(BaseModel):
 
 class ConciliacionSchema(BaseModel):
     id: int
+    mes_conciliado: str
+    año_conciliado: str
+    cuenta_conciliada: str
     estado: str
-    id_empresa: int
 
     class Config:
         orm_mode = True
