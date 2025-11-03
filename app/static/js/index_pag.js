@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 } else {
                     // Mostrar mensaje de éxito
                     console.log("Archivos cargados exitosamente:", result);
-                    alert("Archivos cargados exitosamente. Continuar con la conciliación.");
+                    window.location.reload();
                 }
             } catch (error) {
                 console.error("Error al enviar los archivos:", error);

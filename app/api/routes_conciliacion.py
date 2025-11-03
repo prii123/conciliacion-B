@@ -141,3 +141,43 @@ async def upload_files(
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
+
+@router.post("/{conciliacion_id}/procesar")
+def procesar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
+    """
+    Procesa automáticamente una conciliación utilizando los métodos de conciliación en utils/conciliaciones.py.
+    """
+    realizar_conciliacion_automatica(conciliacion_id, db)
+    return {"message": f"Conciliación #{conciliacion_id} procesada automáticamente."}
+
+@router.post("/{conciliacion_id}/terminar_conciliacion")
+def terminar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    if not conciliacion:
+        raise HTTPException(404, "Conciliación no encontrada")
+    conciliacion.estado = "finalizada"
+    db.commit()
+    return {"message": f"Conciliación #{conciliacion_id} marcada como finalizada."}
+
+class ConciliacionManualRequest(BaseModel):
+    id_banco: List[int]
+    id_auxiliar: List[int]
+
+@router.post("/{conciliacion_id}/conciliar-manual")
+def conciliar_manual(conciliacion_id: int, request: ConciliacionManualRequest, db: Session = Depends(get_db)):
+    """
+    Realiza una conciliación manual utilizando el método en utils/conciliaciones.py.
+    """
+    resultado = crear_conciliacion_manual(conciliacion_id, request.id_banco, request.id_auxiliar, db)
+    return {"message": "Conciliación manual realizada con éxito.", "resultado": resultado}
+
+@router.delete("/match/{match_id}/eliminar")
+def eliminar_match_manual(match_id: int, db: Session = Depends(get_db)):
+    match = db.query(ConciliacionMatch).filter(ConciliacionMatch.id == match_id).first()
+    if not match:
+        raise HTTPException(404, "Match no encontrado")
+    # optional: unmark movimientos if desired
+    db.delete(match)
+    db.commit()
+    return {"message": f"Match #{match_id} eliminado con éxito."}
+

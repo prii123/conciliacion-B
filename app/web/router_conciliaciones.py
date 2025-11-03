@@ -28,6 +28,9 @@ def detalle_conciliacion(request: Request, conciliacion_id: int, db: Session = D
 def lista_conciliaciones(request: Request):
     return templates.TemplateResponse("lista_conciliaciones.html", {"request": request}) 
 
-@router.get("/matches_conciliacion", name="matches_conciliacion")
-def matches_conciliacion(request: Request):
-    return templates.TemplateResponse("matches_conciliacion.html", {"request": request})
+@router.get("/matches_conciliacion/{conciliacion_id}", name="matches_conciliacion")
+def matches_conciliacion(request: Request, conciliacion_id: int):
+    return templates.TemplateResponse("matches_conciliacion.html", {
+        "request": request,
+        "conciliacion": {"id": conciliacion_id}
+    })

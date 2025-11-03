@@ -66,7 +66,7 @@ const EmpresasManager = {
             const empresasData = await response.json();
 
             // Registrar la respuesta para depuración
-            console.log('Respuesta de la API:', empresasData);
+            // console.log('Respuesta de la API:', empresasData);
 
             // Verificar si la respuesta contiene la propiedad "empresas" y es un array
             if (!empresasData || !Array.isArray(empresasData.empresas)) {

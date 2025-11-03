@@ -5,69 +5,125 @@
 
 
 {% block content %}
-<div id="conciliaciones-container" data-conciliacion-id="{{ conciliacion_id }}" class="container py-5">
-    <!-- Contenedor para las estadísticas -->
-    <div id="stats-container" class="mb-4"></div>
+<div id="conciliaciones-container" data-conciliacion-id="{{ conciliacion.id }}">
+    <!-- Contenido dinámico cargado por JavaScript -->
+</div>
 
-    <!-- Contenedor para la barra de progreso -->
-    <div id="progress-bar-container" class="mb-4"></div>
+<div class="mb-4">
+    <a href="/lista_conciliaciones" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Volver a Lista
+    </a>
+</div>
 
-    <div class="info-row">
-        <form id="procesar-conciliacion-form" method="post">
-            <button type="submit" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-repeat me-2"></i> Procesar conciliación Automáticamente
+<div id="stats-container" class="mb-4"></div>
+<div id="progress-bar-container" class="mb-4"></div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="mb-3"><i class="bi bi-info-circle me-2"></i>Información de la Conciliación</h5>
+        <div class="row">
+            <div class="col-md-6">
+                <div id="info-conciliacion"></div>
+            </div>
+            <div class="col-md-6">
+                <div class="info-row">
+                    <i class="bi bi-check-circle"></i>
+                    <span class="info-label">Estado:</span>
+                    <span id="estado-badge"></span>
+                </div>
+                <div class="info-row">
+                    <form id="procesar-conciliacion-form" method="post">
+                        <button type="submit" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-repeat me-2"></i> Procesar conciliación Automáticamente
+                        </button>
+                    </form>
+                </div>
+
+                <div class="col-md-6">
+                    <form id="terminar-conciliacion-form" method="post">
+                        <button type="submit" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-repeat me-2"></i> Terminar conciliación
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mb-4">
+    <a href="/conciliaciones/matches_conciliacion/{{ conciliacion.id }}" class="btn btn-primary">
+        <i class="bi bi-link-45deg me-2"></i> Ver Matches de Conciliación
+    </a> 
+</div>
+
+<div class="tabs-container">
+    <button id="btnOkBanco" class="btn btn-primary mt-2">Ir a Auxiliar</button>
+    <button id="btnConfirmarConciliacion" class="btn btn-success mt-2">Confirmar Conciliación</button>
+
+    <ul class="nav nav-tabs" id="movimientosTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="banco-tab" data-bs-toggle="tab" data-bs-target="#banco" type="button" role="tab">
+                <i class="bi bi-bank me-2"></i>Banco No Conciliados (<span id="banco-count">0</span>)
             </button>
-        </form>
-    </div>
-
-    <div class="info-row">
-        <i class="bi bi-check-circle"></i>
-        <span class="info-label">Estado:</span>
-        <span id="estado-badge"></span>
-    </div>
-
-    <div class="col-md-6">
-        <form id="terminar-conciliacion-form" method="post">
-            <button type="submit" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-repeat me-2"></i> Terminar conciliación
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="auxiliar-tab" data-bs-toggle="tab" data-bs-target="#auxiliar" type="button" role="tab">
+                <i class="bi bi-journal-text me-2"></i>Auxiliar No Conciliados (<span id="auxiliar-count">0</span>)
             </button>
-        </form>
-    </div>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="conciliados-tab" data-bs-toggle="tab" data-bs-target="#conciliados" type="button" role="tab">
+                <i class="bi bi-check-circle me-2"></i>Conciliados (<span id="conciliados-count">0</span>)
+            </button>
+        </li>
+    </ul>
 
-    <div class="tabs-container">
-        <button id="btnOkBanco" class="btn btn-primary mt-2">Ir a Auxiliar</button>
-        <button id="btnConfirmarConciliacion" class="btn btn-success mt-2">Confirmar Conciliación</button>
-
-        <ul class="nav nav-tabs" id="movimientosTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="banco-tab" data-bs-toggle="tab" data-bs-target="#banco" type="button" role="tab">
-                    <i class="bi bi-bank me-2"></i>Banco No Conciliados (<span id="banco-count">0</span>)
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="auxiliar-tab" data-bs-toggle="tab" data-bs-target="#auxiliar" type="button" role="tab">
-                    <i class="bi bi-journal-text me-2"></i>Auxiliar No Conciliados (<span id="auxiliar-count">0</span>)
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="conciliados-tab" data-bs-toggle="tab" data-bs-target="#conciliados" type="button" role="tab">
-                    <i class="bi bi-check-circle me-2"></i>Conciliados (<span id="conciliados-count">0</span>)
-                </button>
-            </li>
-        </ul>
-
-        <div class="tab-content">
-            <div class="tab-pane fade show active" id="banco" role="tabpanel">
-                <div id="banco-movimientos"></div>
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="banco" role="tabpanel">
+            <div id="banco-movimientos">
+                <!-- Tabla con checkboxes para movimientos no conciliados del banco -->
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>ID</th>
+                            <th>Fecha</th>
+                            <th>Descripción</th>
+                            <th>Valor</th>
+                            <th>Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="banco-movimientos-body">
+                        <!-- Filas dinámicas generadas por JavaScript -->
+                    </tbody>
+                </table>
             </div>
+        </div>
 
-            <div class="tab-pane fade" id="auxiliar" role="tabpanel">
-                <div id="auxiliar-movimientos"></div>
+        <div class="tab-pane fade" id="auxiliar" role="tabpanel">
+            <div id="auxiliar-movimientos">
+                <!-- Tabla con checkboxes para movimientos no conciliados del auxiliar -->
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>ID</th>
+                            <th>Fecha</th>
+                            <th>Descripción</th>
+                            <th>Valor</th>
+                            <th>Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auxiliar-movimientos-body">
+                        <!-- Filas dinámicas generadas por JavaScript -->
+                    </tbody>
+                </table>
             </div>
+        </div>
 
-            <div class="tab-pane fade" id="conciliados" role="tabpanel">
-                <div id="conciliados-movimientos"></div>
-            </div>
+        <div class="tab-pane fade" id="conciliados" role="tabpanel">
+            <div id="conciliados-movimientos"></div>
         </div>
     </div>
 </div>

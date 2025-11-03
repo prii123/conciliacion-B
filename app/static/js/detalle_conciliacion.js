@@ -7,9 +7,9 @@ const movimientosBancoData = JSON.parse(document.body.dataset.movimientosBanco |
 const movimientosAuxiliarData = JSON.parse(document.body.dataset.movimientosAuxiliar || '{}');
 const conciliacionId = document.body.dataset.conciliacionId;
 
-console.log('Datos de movimientos banco:', movimientosBancoData);
-console.log('Datos de movimientos auxiliar:', movimientosAuxiliarData);
-console.log('ID de conciliación:', conciliacionId);
+// console.log('Datos de movimientos banco:', movimientosBancoData);
+// console.log('Datos de movimientos auxiliar:', movimientosAuxiliarData);
+// console.log('ID de conciliación:', conciliacionId);
 
 
 // =============================
@@ -26,11 +26,11 @@ let seleccionAuxiliar = [];
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded event triggered.');
 
-    const container = document.querySelector("#conciliaciones-container");
+    const container = verifyElementExists("conciliaciones-container");
     const conciliacionId = container?.dataset.conciliacionId;
 
     if (!conciliacionId) {
-        console.error("El ID de la conciliación no está definido en el atributo data-conciliacion-id.");
+        // console.error("El ID de la conciliación no está definido en el atributo data-conciliacion-id.");
         return;
     }
 
@@ -43,23 +43,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            console.log("Detalles de la conciliación cargados:", data);
+            // console.log("Detalles de la conciliación cargados:", data);
+
+            // console.log("Movimientos no conciliados (banco):", data.movimientos_no_conciliados.banco);
+            // console.log("Movimientos no conciliados (auxiliar):", data.movimientos_no_conciliados.auxiliar);
+            console.log("Movimientos conciliados:", data.movimientos_conciliados);
 
             // Renderizar estadísticas
-            renderStats(data.stats);
+            const statsContainer = verifyElementExists("stats-container");
+            if (statsContainer) renderStats(data.stats);
 
             // Renderizar barra de progreso
-            renderProgressBar(data.stats);
+            const progressBarContainer = verifyElementExists("progress-bar-container");
+            if (progressBarContainer) renderProgressBar(data.stats);
+
+            // Renderizar información de la conciliación
+            const infoContainer = verifyElementExists("info-conciliacion");
+            if (infoContainer) renderInfoConciliacion(data.conciliacion);
 
             // Renderizar movimientos
             renderMovimientos(data.movimientos_no_conciliados, data.movimientos_conciliados);
         } catch (error) {
-            console.error("Error al cargar los detalles de la conciliación:", error);
-            container.innerHTML = `
-                <div class="alert alert-danger text-center">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Error al cargar los detalles de la conciliación.
-                </div>
-            `;
+            // console.error("Error al cargar los detalles de la conciliación:", error);
+            const container = document.getElementById("conciliaciones-container");
+            if (container) {
+                container.innerHTML = `
+                    <div class="alert alert-danger text-center">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Error al cargar los detalles de la conciliación.
+                    </div>
+                `;
+            }
         }
     };
 
@@ -75,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         `;
-    };
+    }; 
 
     const renderProgressBar = (stats) => {
         const progressBarContainer = document.getElementById("progress-bar-container");
@@ -94,49 +107,112 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     };
 
+    const renderInfoConciliacion = (conciliacion) => {
+        const infoContainer = document.getElementById("info-conciliacion");
+        infoContainer.innerHTML = `
+            <p><strong>ID:</strong> #${conciliacion.id}</p>
+            <p><strong>Periodo:</strong> ${conciliacion.mes_conciliado} ${conciliacion.año_conciliado}</p>
+            <p><strong>Cuenta:</strong> ${conciliacion.cuenta_conciliada}</p>
+            <p><strong>Fecha Proceso:</strong> ${conciliacion.fecha_proceso}</p>
+        `;
+
+        const estadoBadge = document.getElementById("estado-badge");
+        estadoBadge.textContent = conciliacion.estado;
+    };
+
     const renderMovimientos = (movimientosNoConciliados, movimientosConciliados) => {
+        // console.log("Llamando a renderMovimientos...");
+        // console.log("Movimientos no conciliados (banco):", movimientosNoConciliados.banco);
+        // console.log("Movimientos no conciliados (auxiliar):", movimientosNoConciliados.auxiliar);
+        // console.log("Movimientos conciliados:", movimientosConciliados);
+
         document.getElementById("banco-count").textContent = movimientosNoConciliados.banco.length;
         document.getElementById("auxiliar-count").textContent = movimientosNoConciliados.auxiliar.length;
         document.getElementById("conciliados-count").textContent = movimientosConciliados.length;
 
-        document.getElementById("banco-movimientos").innerHTML = renderMovimientosTable(movimientosNoConciliados.banco);
-        document.getElementById("auxiliar-movimientos").innerHTML = renderMovimientosTable(movimientosNoConciliados.auxiliar);
-        document.getElementById("conciliados-movimientos").innerHTML = renderMovimientosTable(movimientosConciliados);
+        document.getElementById("banco-movimientos").innerHTML = renderMovimientosTable(movimientosNoConciliados.banco, "banco");
+        document.getElementById("auxiliar-movimientos").innerHTML = renderMovimientosTable(movimientosNoConciliados.auxiliar, "auxiliar");
+        document.getElementById("conciliados-movimientos").innerHTML = renderMovimientosTable(movimientosConciliados, "conciliados");
     };
 
-    const renderMovimientosTable = (movimientos) => {
+    const renderMovimientosTable = (movimientos, tipo) => {
+        // console.log(`Generando tabla para tipo: ${tipo}`);
+        // console.log(`Movimientos recibidos:`, movimientos);
+
         if (movimientos.length === 0) {
+            // console.log(`No hay movimientos disponibles para el tipo: ${tipo}`);
             return `<div class="alert alert-warning">No hay movimientos disponibles.</div>`;
         }
 
-        const rows = movimientos.map(mov => `
-            <tr>
-                <td>${mov.id}</td>
-                <td>${mov.fecha}</td>
-                <td>${mov.descripcion}</td>
-                <td>${mov.valor}</td>
-                <td>${mov.es}</td>
-                <td>${mov.tipo}</td>
-            </tr>
-        `).join("");
-
-        return `
-            <table class="table">
-                <thead>
+        const rows = movimientos.map(mov => {
+            if (tipo === "conciliados") {
+                return `
                     <tr>
-                        <th>ID</th>
-                        <th>Fecha</th>
-                        <th>Descripción</th>
-                        <th>Valor</th>
-                        <th>Tipo</th>
-                        <th>Origen</th>
+                        <td>${mov.id}</td>
+                        <td>${mov.id_movimiento_banco}</td>
+                        <td>${mov.id_movimiento_auxiliar}</td>
+                        <td>${mov.fecha_match}</td>
+                        <td>${mov.criterio_match}</td>
+                        <td>${mov.diferencia_valor}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    ${rows}
-                </tbody>
-            </table>
-        `;
+                `;
+            } else {
+                return `
+                    <tr>
+                        <td><input type="checkbox" class="chk-mov" data-tipo="${tipo}" data-id="${mov.id}" data-es="${mov.es}" /></td>
+                        <td>${mov.id}</td>
+                        <td>${mov.fecha}</td>
+                        <td>${mov.descripcion}</td>
+                        <td>${mov.valor}</td>
+                        <td>${mov.es}</td>
+                        <td>${mov.tipo}</td>
+                    </tr>
+                `;
+            }
+        }).join("");
+
+        if (tipo === "conciliados") {
+            return `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>ID Banco</th>
+                                <th>ID Auxiliar</th>
+                                <th>Fecha Match</th>
+                                <th>Criterio Match</th>
+                                <th>Diferencia Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Valor</th>
+                                <th>Tipo</th>
+                                <th>Origen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
     };
 
     loadConciliacionDetails();
@@ -147,11 +223,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('El botón con ID "btnOkBanco" no se encontró en el DOM.');
     } else {
         btnOkBanco.addEventListener('click', () => {
-            console.log('btnOkBanco clicked');
+            // console.log('btnOkBanco clicked');
             const selecciones = MovimientoSelector.getSelecciones();
-            console.log('Selecciones obtenidas:', selecciones);
+            // console.log('Selecciones obtenidas:', selecciones);
             const seleccionadosBanco = selecciones.banco;
-            console.log('Seleccionados banco:', seleccionadosBanco);
+            // console.log('Seleccionados banco:', seleccionadosBanco);
             if (!seleccionadosBanco || seleccionadosBanco.length === 0) {
                 alert('Seleccione al menos un movimiento de banco.');
                 return;
@@ -162,14 +238,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 seleccionadosBanco.map(id => {
                     const movimiento = MovimientoSelector.movimientosBanco[id];
                     if (!movimiento) {
-                        console.error(`Movimiento con ID ${id} no encontrado en movimientosBanco.`);
+                        // console.error(`Movimiento con ID ${id} no encontrado en movimientosBanco.`);
                         return null; // Retornar un valor nulo para evitar errores
                     }
                     return movimiento.es;
                 }).filter(es => es !== null) // Filtrar valores nulos
             );
 
-            console.log('Tipos seleccionados después de validación:', tipos);
+            // console.log('Tipos seleccionados después de validación:', tipos);
             if (tipos.size > 1) {
                 alert('Seleccione solo movimientos del mismo tipo (E o S).');
                 return;
@@ -180,11 +256,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Cambiar pestaña automáticamente
             const auxTabElement = document.getElementById('auxiliar-tab');
-            console.log('auxTabElement:', auxTabElement);
+            // console.log('auxTabElement:', auxTabElement);
             if (auxTabElement) {
                 const auxTab = new bootstrap.Tab(auxTabElement);
                 auxTab.show();
-                console.log('Pestaña auxiliar mostrada correctamente.');
+                // console.log('Pestaña auxiliar mostrada correctamente.');
             } else {
                 console.error('El elemento con ID "auxiliar-tab" no se encontró en el DOM.');
             }
@@ -196,48 +272,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnConfirmarConciliacion) {
         btnConfirmarConciliacion.addEventListener('click', () => {
-            const selecciones = MovimientoSelector.getSelecciones();
-            const seleccionadosAux = selecciones.auxiliar;
+            // console.log('Botón Confirmar Conciliación clickeado');
 
-            console.log('btnConfirmarConciliacion element:', selecciones);
-            console.log("movimientoSelector", window.MovimientoSelector.seleccionados);
-            console.log('fech inicial datos:', movimientosAuxiliarData);
-
-            if (!seleccionadosAux || seleccionadosAux.length === 0) {
-                alert('Seleccione al menos un movimiento auxiliar.');
+            // Verificar que hay datos seleccionados
+            if (seleccionBanco.length === 0 || seleccionAuxiliar.length === 0) {
+                alert('Debe seleccionar al menos un movimiento de banco y uno de auxiliar.');
                 return;
             }
 
-            const tiposAux = new Set(seleccionadosAux.map(id => movimientosAuxiliarData[id].es));
-            if (tiposAux.size > 1 || [...tiposAux][0] !== tipoBancoSeleccionado) {
-                alert('Los movimientos auxiliares deben ser del mismo tipo (E o S) que los del banco.');
-                return;
-            }
-
-            seleccionAuxiliar = seleccionadosAux;
-
+            // Crear el payload con los datos seleccionados
             const payload = {
                 id_banco: seleccionBanco,
                 id_auxiliar: seleccionAuxiliar
             };
 
-            fetch(window.conciliarManualUrl, {
+            // console.log('Payload a enviar:', payload);
+
+            // Enviar los datos al backend
+            fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/conciliar-manual`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
                 .then(async res => {
                     const data = await res.json().catch(() => ({}));
-                    if (res.ok && data.success) {
-                        alert(data.mensaje || 'Conciliación creada correctamente.');
+                    // console.log('Respuesta del servidor:', data);
+                    if (res.ok && data.message) {
+                        alert(data.message);
                         window.location.reload();
                     } else {
-                        alert(data.error || 'Error al crear la conciliación manual.');
+                        alert(data.error || 'Error al realizar la conciliación manual.');
                     }
                 })
                 .catch(err => {
-                    console.error(err);
-                    alert('Error de red al intentar crear la conciliación.');
+                    console.error('Error de red:', err);
+                    alert('Error de red al intentar realizar la conciliación manual.');
                 });
         });
     } else {
@@ -257,6 +326,82 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const procesarConciliacionForm = document.getElementById("procesar-conciliacion-form");
+    procesarConciliacionForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/procesar`, {
+                method: "POST",
+            });
+
+            if (!response.ok) {
+                throw new Error("Error al procesar la conciliación automáticamente.");
+            }
+
+            const data = await response.json();
+            // alert(data.message || "Conciliación procesada automáticamente con éxito.");
+            window.location.reload();
+        } catch (error) {
+            console.error("Error al procesar la conciliación:", error);
+            // alert("Ocurrió un error al intentar procesar la conciliación automáticamente.");
+        }
+    });
+
+    const terminarConciliacionForm = document.getElementById('terminar-conciliacion-form');
+
+    if (terminarConciliacionForm) {
+        terminarConciliacionForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/terminar_conciliacion`, {
+                    method: 'POST',
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al terminar la conciliación.');
+                }
+
+                const data = await response.json();
+                alert(data.message || 'Conciliación terminada con éxito.');
+                window.location.reload();
+            } catch (error) {
+                console.error('Error al intentar terminar la conciliación:', error);
+                alert('Ocurrió un error al intentar terminar la conciliación.');
+            }
+        });
+    } else {
+        console.error('El formulario con ID "terminar-conciliacion-form" no se encontró en el DOM.');
+    }
+
+
+    document.addEventListener('change', (event) => {
+        const checkbox = event.target;
+
+        if (checkbox.classList.contains('chk-mov')) {
+            const tipo = checkbox.dataset.tipo;
+            const id = parseInt(checkbox.dataset.id);
+
+            if (checkbox.checked) {
+                if (tipo === 'banco') {
+                    seleccionBanco.push(id);
+                } else if (tipo === 'auxiliar') {
+                    seleccionAuxiliar.push(id);
+                }
+            } else {
+                if (tipo === 'banco') {
+                    seleccionBanco = seleccionBanco.filter(item => item !== id);
+                } else if (tipo === 'auxiliar') {
+                    seleccionAuxiliar = seleccionAuxiliar.filter(item => item !== id);
+                }
+            }
+
+            // console.log('Seleccionados banco:', seleccionBanco);
+            // console.log('Seleccionados auxiliar:', seleccionAuxiliar);
+        }
+    });
 });
 
 function renderConciliacionDetails(data) {
@@ -329,22 +474,29 @@ function renderMovimientosTable(movimientos) {
         `;
     }
 
-    const rows = movimientos.map(mov => `
-        <tr>
-            <td>${mov.id}</td>
-            <td>${mov.fecha}</td>
-            <td>${mov.descripcion}</td>
-            <td>${mov.valor}</td>
-            <td>${mov.es}</td>
-            <td>${mov.tipo}</td>
-        </tr>
-    `).join("");
+    const rows = movimientos.map(mov => {
+        console.log(`Generando fila para movimiento:`, mov);
+        return `
+            <tr>
+                <td><input type="checkbox" class="chk-mov" data-tipo="${tipo}" data-id="${mov.id}" data-es="${mov.es}" /></td>
+                <td>${mov.id}</td>
+                <td>${mov.fecha}</td>
+                <td>${mov.descripcion}</td>
+                <td>${mov.valor}</td>
+                <td>${mov.es}</td>
+                <td>${mov.tipo}</td>
+            </tr>
+        `;
+    }).join("");
+
+    console.log(`Filas generadas para tipo: ${tipo}`, rows);
 
     return `
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
                     <tr>
+                        <th></th>
                         <th>ID</th>
                         <th>Fecha</th>
                         <th>Descripción</th>
@@ -360,6 +512,40 @@ function renderMovimientosTable(movimientos) {
         </div>
     `;
 }
+
+const verifyElementExists = (id) => {
+    const element = document.getElementById(id);
+    if (!element) {
+        console.error(`El elemento con ID "${id}" no se encontró en el DOM.`);
+    }
+    return element;
+};
+
+const getSelectedMovements = (tableBodyId) => {
+    console.log(`Buscando checkboxes seleccionados en el contenedor con ID: ${tableBodyId}`);
+
+    const container = document.getElementById(tableBodyId);
+    if (!container) {
+        console.error(`El contenedor con ID ${tableBodyId} no existe en el DOM.`);
+        return [];
+    }
+
+    const checkboxes = container.querySelectorAll(`input[type='checkbox']:checked`);
+    console.log(`Checkboxes encontrados en el contenedor ${tableBodyId}:`, checkboxes);
+
+    const selected = [];
+    checkboxes.forEach(checkbox => {
+        if (!checkbox.value) {
+            console.warn('Checkbox encontrado sin atributo value:', checkbox);
+        } else {
+            console.log(`Checkbox con valor: ${checkbox.value}`);
+            selected.push(parseInt(checkbox.value));
+        }
+    });
+
+    console.log(`Movimientos seleccionados en ${tableBodyId}:`, selected);
+    return selected;
+};
 
 
 
