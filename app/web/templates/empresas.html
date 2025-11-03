@@ -1,0 +1,90 @@
+
+
+{% extends "base.html" %}
+
+{% block title %}Gestión de Empresas{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="header-section fade-in">
+            <h1><i class="bi bi-building me-2"></i>Gestión de Empresas</h1>
+            <p>Administre las empresas y sus conciliaciones bancarias.</p>
+            <a href="/empresas/nueva" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle me-2"></i>Nueva Empresa
+            </a>
+        </div>
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-body">
+                <!-- Header con título y controles -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="card-title mb-1">
+                            <i class="bi bi-list me-2"></i>Empresas Registradas
+                        </h5>
+                        <small class="text-muted" id="empresasCounter">Cargando...</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" id="btnRefresh" title="Refrescar">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+
+                <!-- Barra de búsqueda y filtros -->
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="searchEmpresas" 
+                                placeholder="Buscar por NIT, razón social, nombre o ciudad...">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="filterEstado">
+                            <option value="todas">Todas las empresas</option>
+                            <option value="activa">Solo activas</option>
+                            <option value="inactiva">Solo inactivas</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Contenedor para alerta (sin datos) -->
+                <div id="alertContainer" style="display: none;"></div>
+                
+                <!-- Tabla de empresas -->
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">NIT</th>
+                                <th scope="col">Razón Social</th>
+                                <th scope="col">Nombre Comercial</th>
+                                <th scope="col">Ciudad</th>
+                                <th scope="col">Estado</th>
+                                <th scope="col">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="empresasTableBody">
+                            <!-- Las empresas se cargarán dinámicamente aquí --> 
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/empresas.js" type="module"></script>
+{% endblock %}
+
+
+
+
+

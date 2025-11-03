@@ -20,9 +20,9 @@
             </div>
 
             <!-- ================== FORMULARIO DE ARCHIVOS ================== -->
-            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+            <form  method="post" enctype="multipart/form-data" id="uploadForm">
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-6"> 
                         {{ macros.file_input('banco', 'Archivo del Banco', 'bank') }}
                     </div>
                     <div class="col-md-6">
@@ -41,9 +41,6 @@
                                 </label>
                                 <select class="form-select" name="id_empresa" id="id_empresa" required>
                                     <option value="">Seleccione una empresa</option>
-                                    {% for empresa in empresas %}
-                                        <option value="{{ empresa.id }}">{{ empresa.razon_social }}</option>
-                                    {% endfor %}
                                 </select>
                             </div>
                             <div class="col-md-4 text-end">
@@ -126,6 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
     FileHandler.init('file_auxiliar', 'label_auxiliar', 'name_auxiliar');
 });
 </script>
+<script src="/static/js/index_pag.js" type="module"></script>
 {% endblock %}
 
 

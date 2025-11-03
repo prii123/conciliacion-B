@@ -30,7 +30,7 @@
     <div class="col-md-4">
         <div class="match-stats">
             <div class="stat-value-large">
-                {{ matches|selectattr('diferencia', 'ne', 0.0)|list|length }}
+                {{ total_manual }}
             </div>
             <div class="text-muted">Manuales</div>
         </div>
@@ -115,5 +115,7 @@
 {% else %}
     {{ macros.empty_state('link-45deg', 'No se encontraron matches para esta conciliación') }}
 {% endif %}
+
+
 {% endblock %}
 

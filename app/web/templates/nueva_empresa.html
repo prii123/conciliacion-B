@@ -8,9 +8,9 @@
 
     {% if error %}
     <div class="alert alert-danger mt-3">{{ error }}</div>
-    {% endif %}
+    {% endif %} 
 
-    <form action="{{ url_for('nueva_empresa') }}" method="post" class="mt-3">
+    <form method="post" class="mt-3">
         <div class="mb-3">
             <label for="nit" class="form-label">NIT</label>
             <input type="text" name="nit" id="nit" class="form-control" required value="{{ nit or '' }}">
@@ -54,4 +54,8 @@
         </a>
     </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/nueva_empresa.js" type="module"></script>
 {% endblock %}

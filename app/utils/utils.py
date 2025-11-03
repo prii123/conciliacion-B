@@ -2,6 +2,10 @@ import pandas as pd
 from app.models import Conciliacion, Movimiento
 
 
+# Variable base para la URL del servidor
+BASE_URL = "http://localhost"
+
+
 def format_currency(v):
     try:
         return f"${v:,.2f}"

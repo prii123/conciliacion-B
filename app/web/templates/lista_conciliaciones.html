@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% import "macros.html" as macros %}
+
+{% block title %}Lista de Conciliaciones{% endblock %}
+
+{% block content %}
+<div id="conciliaciones-container" class="container py-5">
+    <div class="alert alert-info text-center">
+        <i class="bi bi-info-circle-fill me-2"></i>Cargando conciliaciones...
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/lista_conciliaciones.js" type="module"></script>
+{% endblock %}
