@@ -1,4 +1,6 @@
+from pathlib import Path
 from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Conciliacion
@@ -37,3 +39,14 @@ def matches_conciliacion(request: Request, conciliacion_id: int):
         "request": request,
         "conciliacion": {"id": conciliacion_id}
     })
+
+
+@router.get('/descargar_plantilla')
+def descargar_plantilla():
+    """Devuelve el archivo plantilla_movimientos.xlsx ubicado en la raíz del proyecto."""
+    # project package_dir is app/ so go up one more level to reach repo root
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    candidate = repo_root / 'plantilla_movimientos.xlsx'
+    if not candidate.exists():
+        raise HTTPException(status_code=404, detail='Plantilla no encontrada')
+    return FileResponse(str(candidate), media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename='plantilla_movimientos.xlsx')
