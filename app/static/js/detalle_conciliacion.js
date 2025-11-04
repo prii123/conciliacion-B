@@ -43,11 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            // console.log("Detalles de la conciliación cargados:", data);
-
+            console.log("Detalles de la conciliación cargados:", data);
             // console.log("Movimientos no conciliados (banco):", data.movimientos_no_conciliados.banco);
             // console.log("Movimientos no conciliados (auxiliar):", data.movimientos_no_conciliados.auxiliar);
-            console.log("Movimientos conciliados:", data.movimientos_conciliados);
+            // console.log("Movimientos conciliados:", data.movimientos_conciliados);
 
             // Renderizar estadísticas
             const statsContainer = verifyElementExists("stats-container");
@@ -118,6 +117,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const estadoBadge = document.getElementById("estado-badge");
         estadoBadge.textContent = conciliacion.estado;
+
+        // Cambiar color y desactivar botones si el estado es "finalizada"
+        if (conciliacion.estado.toLowerCase() === "finalizada") {
+            estadoBadge.classList.add("text-muted"); // Cambiar color a gris
+
+            const procesarForm = document.getElementById("procesar-conciliacion-form");
+            const terminarForm = document.getElementById("terminar-conciliacion-form");
+
+            if (procesarForm) {
+                procesarForm.querySelector("button").disabled = true;
+            }
+
+            if (terminarForm) {
+                terminarForm.querySelector("button").disabled = true;
+            }
+        }
     };
 
     const renderMovimientos = (movimientosNoConciliados, movimientosConciliados) => {
@@ -298,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await res.json().catch(() => ({}));
                     // console.log('Respuesta del servidor:', data);
                     if (res.ok && data.message) {
-                        alert(data.message);
+                        // alert(data.message);
                         window.location.reload();
                     } else {
                         alert(data.error || 'Error al realizar la conciliación manual.');
@@ -365,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const data = await response.json();
-                alert(data.message || 'Conciliación terminada con éxito.');
+                // alert(data.message || 'Conciliación terminada con éxito.');
                 window.location.reload();
             } catch (error) {
                 console.error('Error al intentar terminar la conciliación:', error);

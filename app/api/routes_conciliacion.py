@@ -21,10 +21,16 @@ def lista_conciliaciones_json(db: Session = Depends(get_db)):
     conciliaciones_por_empresa = {}
     for c in conciliaciones:
         empresa = c.empresa.razon_social if c.empresa and c.empresa.razon_social else (c.empresa.nombre_comercial if c.empresa else 'Desconocida')
- 
-        movimientos = db.query(Movimiento).filter(Movimiento.id_conciliacion == c.id).all()
-        total = len(movimientos)
-        conciliados = db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == c.id).count()
+
+        # Obtener estadísticas directamente desde la tabla Movimiento
+        total = db.query(Movimiento).filter(Movimiento.id_conciliacion == c.id).count()
+        conciliados = db.query(Movimiento).filter(
+            Movimiento.id_conciliacion == c.id,
+            Movimiento.estado_conciliacion == "conciliado"
+        ).count()
+        pendientes = total - conciliados
+
+        # Calcular el porcentaje de conciliación
         porcentaje = int((conciliados / total) * 100) if total else 0
 
         conc_obj = {
@@ -35,6 +41,7 @@ def lista_conciliaciones_json(db: Session = Depends(get_db)):
             'estado': c.estado,
             'total_movimientos': total,
             'conciliados': conciliados,
+            'pendientes': pendientes,
             'porcentaje_conciliacion': porcentaje,
         }
 
@@ -59,17 +66,52 @@ def detalle_conciliacion_json(conciliacion_id: int, db: Session = Depends(get_db
         "banco": jsonable_encoder([m for m in movimientos if m.tipo == "banco" and m.estado_conciliacion == "no_conciliado"]),
         "auxiliar": jsonable_encoder([m for m in movimientos if m.tipo == "auxiliar" and m.estado_conciliacion == "no_conciliado"]),
     }
-    movimientos_conciliados = db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == conciliacion_id).all()
 
+    movimientos_conciliados_automaticos = [
+        {
+            "id": match.id,
+            "id_movimiento_banco": match.id_movimiento_banco,
+            "id_movimiento_auxiliar": match.id_movimiento_auxiliar,
+            "fecha_match": match.fecha_match,
+            "criterio_match": match.criterio_match,
+            "diferencia_valor": match.diferencia_valor
+        }
+        for match in db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == conciliacion_id).all()
+    ]
+
+    movimientos_conciliados_manuales = [
+        {
+            "id": cm.id,
+            "id_movimiento_banco": banco.id,
+            "id_movimiento_auxiliar": auxiliar.id,
+            "fecha_match": cm.fecha_creacion,
+            "criterio_match": "manual",
+            "diferencia_valor": abs(banco.valor - auxiliar.valor)
+        }
+        for cm in db.query(ConciliacionManual).filter(ConciliacionManual.id_conciliacion == conciliacion_id).all()
+        for banco in db.query(Movimiento).join(ConciliacionManualBanco).filter(ConciliacionManualBanco.id_conciliacion_manual == cm.id).all()
+        for auxiliar in db.query(Movimiento).join(ConciliacionManualAuxiliar).filter(ConciliacionManualAuxiliar.id_conciliacion_manual == cm.id).all()
+    ]
+
+    movimientos_conciliados = movimientos_conciliados_automaticos + movimientos_conciliados_manuales
+
+    # Calcular estadísticas directamente desde la tabla Movimiento
     total = len(movimientos)
     conciliados = len(movimientos_conciliados)
+    pendientes = total - conciliados
     porcentaje = int((conciliados / total) * 100) if total else 0
-    stats = {"porcentaje_conciliacion": porcentaje, "conciliados": conciliados, "total_movimientos": total}
+
+    stats = {
+        "porcentaje_conciliacion": porcentaje,
+        "conciliados": conciliados,
+        "pendientes": pendientes,
+        "total_movimientos": total
+    }
 
     return JSONResponse(content={
         "conciliacion": jsonable_encoder(conciliacion),
         "movimientos_no_conciliados": movimientos_no_conciliados,
-        "movimientos_conciliados": jsonable_encoder(movimientos_conciliados),
+        "movimientos_conciliados": movimientos_conciliados,
         "stats": stats
     })
 
@@ -180,4 +222,51 @@ def eliminar_match_manual(match_id: int, db: Session = Depends(get_db)):
     db.delete(match)
     db.commit()
     return {"message": f"Match #{match_id} eliminado con éxito."}
+
+@router.get("/conciliaciones_empresa/{empresa_id}", name="conciliaciones_empresa_json") 
+def conciliaciones_empresa_json(empresa_id: int, db: Session = Depends(get_db)):
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    conciliaciones = db.query(Conciliacion).filter(Conciliacion.id_empresa == empresa_id).all()
+    en_proceso = [c.to_dict() for c in conciliaciones if c.estado == 'en_proceso']
+    finalizadas = [c.to_dict() for c in conciliaciones if c.estado == 'finalizada']
+
+    return JSONResponse(content={"empresa": empresa.to_dict(), "en_proceso": en_proceso, "finalizadas": finalizadas})
+
+
+@router.get("/{conciliacion_id}/matches_y_manuales", name="matches_y_conciliaciones_manuales")
+def obtener_matches_y_conciliaciones_manuales(conciliacion_id: int, db: Session = Depends(get_db)):
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    movimientos_banco = {mov.id: mov.to_dict() for mov in db.query(Movimiento).filter(Movimiento.tipo == 'banco').all()}
+    movimientos_auxiliar = {mov.id: mov.to_dict() for mov in db.query(Movimiento).filter(Movimiento.tipo == 'auxiliar').all()}
+
+    matches = [
+        {
+            "id": match.id,
+            "movimiento_banco": movimientos_banco.get(match.id_movimiento_banco),
+            "movimiento_auxiliar": movimientos_auxiliar.get(match.id_movimiento_auxiliar),
+            "diferencia": match.diferencia_valor,
+            "criterio_match": match.criterio_match,  # Add criterio_match field
+            "fecha": match.fecha_match  
+        }
+        for match in db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == conciliacion_id).all()
+    ]
+
+    conciliaciones_manuales = db.query(ConciliacionManual).filter(ConciliacionManual.id_conciliacion == conciliacion_id).all()
+    resultado_manuales = [
+        {
+            "id_conciliacion_manual": cm.id,
+            "fecha_creacion": cm.fecha_creacion,
+            "movimientos_banco": [m.to_dict() for m in db.query(Movimiento).join(ConciliacionManualBanco).filter(ConciliacionManualBanco.id_conciliacion_manual == cm.id).all()],
+            "movimientos_auxiliar": [m.to_dict() for m in db.query(Movimiento).join(ConciliacionManualAuxiliar).filter(ConciliacionManualAuxiliar.id_conciliacion_manual == cm.id).all()],
+        }
+        for cm in conciliaciones_manuales
+    ]
+
+    return JSONResponse(content={"matches": matches, "conciliaciones_manuales": resultado_manuales})
 

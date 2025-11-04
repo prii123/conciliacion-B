@@ -41,7 +41,7 @@ def conciliaciones_empresa(empresa_id: int, db: Session = Depends(get_db)):
     conciliaciones = db.query(Conciliacion).filter(Conciliacion.id_empresa == empresa_id).order_by(Conciliacion.id.desc()).all()
     en_proceso = [ConciliacionSchema.from_orm(c).dict() for c in conciliaciones if c.estado == 'en_proceso']
     finalizadas = [ConciliacionSchema.from_orm(c).dict() for c in conciliaciones if c.estado == 'finalizada']
-
+    print("Conciliaciones fetched:", len(en_proceso), "en proceso,", len(finalizadas), "finalizadas")
     return JSONResponse(content={
         "empresa": EmpresaSchema.from_orm(empresa).dict(),
         "conciliaciones": {

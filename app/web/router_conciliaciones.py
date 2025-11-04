@@ -8,9 +8,12 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
 
 
-@router.get("/conciliaciones_empresa", name="conciliaciones_empresa")
-def conciliaciones_empresa(request: Request):
-    return templates.TemplateResponse("conciliaciones_empresa.html", {"request": request})
+@router.get("/{conciliacion_id}/empresa", name="conciliaciones_empresa")
+def conciliaciones_empresa(request: Request, conciliacion_id: int):
+    return templates.TemplateResponse("conciliaciones_empresa.html", {
+        "request": request,
+        "empresa_id": conciliacion_id  # Pasar el ID como empresa_id para el frontend
+    })
 
 @router.get("/detalle/{conciliacion_id}", name="detalle_conciliacion")
 def detalle_conciliacion(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):

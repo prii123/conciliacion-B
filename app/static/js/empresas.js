@@ -176,7 +176,7 @@ const EmpresasManager = {
 
         // Botón Ver Conciliaciones
         const btnConciliaciones = document.createElement('a');
-        btnConciliaciones.href = `/empresas/${empresa.id}/conciliaciones`;
+        btnConciliaciones.href = `/conciliaciones/${empresa.id}/empresa`;
         btnConciliaciones.className = 'btn btn-sm btn-outline-primary';
         btnConciliaciones.title = 'Ver Conciliaciones';
         btnConciliaciones.innerHTML = '<i class="bi bi-file-earmark-text"></i> Conciliaciones';
