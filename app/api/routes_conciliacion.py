@@ -251,8 +251,8 @@ def obtener_matches_y_conciliaciones_manuales(conciliacion_id: int, db: Session 
             "movimiento_banco": movimientos_banco.get(match.id_movimiento_banco),
             "movimiento_auxiliar": movimientos_auxiliar.get(match.id_movimiento_auxiliar),
             "diferencia": match.diferencia_valor,
-            "criterio_match": match.criterio_match,  # Add criterio_match field
-            "fecha": match.fecha_match  
+            "criterio_match": match.criterio_match,
+            "fecha": match.fecha_match
         }
         for match in db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == conciliacion_id).all()
     ]
@@ -268,5 +268,17 @@ def obtener_matches_y_conciliaciones_manuales(conciliacion_id: int, db: Session 
         for cm in conciliaciones_manuales
     ]
 
-    return JSONResponse(content={"matches": matches, "conciliaciones_manuales": resultado_manuales})
+    # Calculate stats for matches
+    stats = {
+        "total_matches": len(matches) + len(resultado_manuales),
+        "exact_matches": len([m for m in matches if m["criterio_match"] == "exacto_S"]),
+        "approximate_matches": len([m for m in matches if m["criterio_match"] == "aproximado_S"]),
+        "manual_matches": len(resultado_manuales)
+    }
+
+    return JSONResponse(content={
+        "matches": matches,
+        "conciliaciones_manuales": resultado_manuales,
+        "stats": stats
+    })
 

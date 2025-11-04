@@ -26,7 +26,7 @@ app.include_router(routes_empresas.router, prefix="/api/empresas", tags=["empres
 # Registrar rutas WEB
 app.include_router(router_home.router, include_in_schema=False)
 app.include_router(router_empresas.router, prefix="/empresas",  include_in_schema=False)
-app.include_router(router_conciliaciones.router, prefix="/conciliaciones")
+app.include_router(router_conciliaciones.router, prefix="/conciliaciones",  include_in_schema=False)
 
 
 
