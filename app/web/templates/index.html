@@ -20,9 +20,9 @@
             </div>
 
             <!-- ================== FORMULARIO DE ARCHIVOS ================== -->
-            <form  method="post" enctype="multipart/form-data" id="uploadForm">
+            <form method="post" enctype="multipart/form-data" id="uploadForm">
                 <div class="row">
-                    <div class="col-md-6"> 
+                    <div class="col-md-6">
                         {{ macros.file_input('banco', 'Archivo del Banco', 'bank') }}
                     </div>
                     <div class="col-md-6">
@@ -31,7 +31,7 @@
                 </div>
 
 
-                 <!-- ================== SELECCIÓN DE EMPRESA ================== -->
+                <!-- ================== SELECCIÓN DE EMPRESA ================== -->
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body">
                         <div class="row align-items-end">
@@ -45,16 +45,16 @@
                             </div>
                             <div class="col-md-4 text-end">
                                 <!-- <button type="button" class="btn btn-outline-primary mt-3 mt-md-0"  -->
-                                    <!-- <i class="bi bi-building-add me-2"></i>Agregar / Editar Empresa -->
+                                <!-- <i class="bi bi-building-add me-2"></i>Agregar / Editar Empresa -->
 
-                                    <a href="{{ url_for('nueva_empresa') }}" class="btn btn-primary mt-3">
-                                        <i class="bi bi-plus-circle me-2"></i>Agregar / Editar Empresa
-                                    </a> 
+                                <a href="{{ url_for('nueva_empresa') }}" class="btn btn-primary mt-3">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar / Editar Empresa
+                                </a>
                                 <!-- </button> -->
                             </div>
                         </div>
                     </div>
-                </div>   
+                </div>
 
                 <div class="row mt-4">
                     <div class="col-md-4">
@@ -63,7 +63,9 @@
                         </label>
                         <select class="form-select" name="mes" id="mes" required>
                             <option value="">Seleccione el mes</option>
-                            {% for mes in ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+                            {% for mes in
+                            ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+                            %}
                             <option value="{{ mes }}">{{ mes }}</option>
                             {% endfor %}
                         </select>
@@ -73,16 +75,16 @@
                         <label for="anio" class="form-label">
                             <i class="bi bi-calendar3 me-2"></i>Año
                         </label>
-                        <input type="number" class="form-control" name="anio" id="anio" 
-                               min="2020" max="2030" value="2024" required>
+                        <input type="number" class="form-control" name="anio" id="anio" min="2020" max="2030"
+                            value="2024" required>
                     </div>
 
                     <div class="col-md-4">
                         <label for="cuenta" class="form-label">
                             <i class="bi bi-credit-card me-2"></i>Cuenta
                         </label>
-                        <input type="text" class="form-control" name="cuenta" id="cuenta" 
-                               placeholder="Ej: Cuenta Corriente 123" required>
+                        <input type="text" class="form-control" name="cuenta" id="cuenta"
+                            placeholder="Ej: Cuenta Corriente 123" required>
                     </div>
                 </div>
 
@@ -91,11 +93,50 @@
                 </button>
             </form>
 
+            <!-- Sección de carga de archivos individuales (oculta por defecto) -->
+            <div class="card mb-4 shadow-sm" id="archivoIndividualSection" style="display: none;">
+                <div class="card-body">
+                    <h5><i class="bi bi-file-earmark me-2"></i>Subir Archivo Individual</h5>
+                    <p>Seleccione la empresa y la conciliación en proceso, luego cargue el archivo.</p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="empresa_individual" class="form-label">
+                                <i class="bi bi-building me-2"></i>Empresa
+                            </label>
+                            <select class="form-select" name="empresa_individual" id="empresa_individual" required>
+                                <option value="">Seleccione una empresa</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="conciliacion_individual" class="form-label">
+                                <i class="bi bi-list-check me-2"></i>Conciliación en Proceso
+                            </label>
+                            <select class="form-select" name="conciliacion_individual" id="conciliacion_individual"
+                                required>
+                                <option value="">Seleccione una conciliación</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            {{ macros.file_input('archivo_individual', 'Archivo CSV', 'file-earmark-spreadsheet') }}
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary mt-4" id="uploadIndividualBtn">
+                        <i class="bi bi-upload me-2"></i>Subir Archivo
+                    </button>
+                </div>
+            </div>
+
             <!-- ================== INFO ================== -->
             <div class="info-card mt-4">
                 <h5><i class="bi bi-info-circle me-2"></i>Formato Requerido</h5>
                 <ul>
-                    <li>Los archivos deben contener las columnas: <strong>fecha</strong>, <strong>descripcion</strong>, <strong>valor</strong>, <strong>es</strong></li>
+                    <li>Los archivos deben contener las columnas: <strong>fecha</strong>, <strong>descripcion</strong>,
+                        <strong>valor</strong>, <strong>es</strong></li>
                     <li>La columna <strong>fecha</strong> debe estar en formato DD-MM-YYYY</li>
                     <li>La columna <strong>es</strong> debe contener 'E' (entrada) o 'S' (salida)</li>
                     <li>Los valores deben ser numéricos (se usará valor absoluto)</li>
@@ -113,17 +154,27 @@
     </div>
 </div>
 
+<!-- ================== NUEVA SECCIÓN PARA ARCHIVOS INDIVIDUALES ================== -->
+<!-- Botón para cambiar modalidad -->
+<div class="text-center mb-4">
+    <button type="button" class="btn btn-outline-primary" id="toggleModalidadBtn">
+        <i class="bi bi-arrow-repeat me-2"></i>Cambiar Modalidad
+    </button>
+</div>
+
+
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    FileHandler.init('file_banco', 'label_banco', 'name_banco');
-    FileHandler.init('file_auxiliar', 'label_auxiliar', 'name_auxiliar');
-});
+    document.addEventListener('DOMContentLoaded', function () {
+        FileHandler.init('file_banco', 'label_banco', 'name_banco');
+        FileHandler.init('file_auxiliar', 'label_auxiliar', 'name_auxiliar');
+        
+        // Inicializar el manejador para el archivo individual
+        FileHandler.init('archivo_individual', 'label_archivo_individual', 'name_archivo_individual');
+    });
 </script>
 <script src="/static/js/index_pag.js" type="module"></script>
 {% endblock %}
-
-

@@ -6,6 +6,7 @@ from typing import List
 import io, pandas as pd
 
 from app.utils.utils import validar_excel
+from app.utils.file_validation import validar_archivo_csv, validar_numeros_debito_credito, formatear_datos_para_movimientos
 from ..database import get_db
 from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar
 from fastapi.encoders import jsonable_encoder
@@ -281,4 +282,59 @@ def obtener_matches_y_conciliaciones_manuales(conciliacion_id: int, db: Session 
         "conciliaciones_manuales": resultado_manuales,
         "stats": stats
     })
+
+@router.post("/upload_individual")
+async def upload_individual(
+    archivo: UploadFile = File(...),
+    empresa_id: int = Form(...),
+    conciliacion_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Leer el contenido del archivo
+        contenido = await archivo.read()
+        contenido_str = contenido.decode("utf-8")
+
+        # Validar el archivo usando la primera validación
+        resultado_validacion = validar_archivo_csv(contenido_str)
+
+        if resultado_validacion["errores"]:
+            return JSONResponse(content={
+                "message": "Errores encontrados en el archivo.",
+                "errores": resultado_validacion["errores"],
+                "filas_invalidas": resultado_validacion["filas_invalidas"]
+            }, status_code=400)
+
+        movimientos = resultado_validacion["movimientos"]
+        print(f"Movimientos obtenidos: {movimientos} registros")
+        # Validar los valores de Debito y Credito
+        errores_conversion = validar_numeros_debito_credito(contenido_str)
+
+        if errores_conversion:
+            return JSONResponse(content={
+                    "message": "Errores encontrados en los valores de Debito y Credito.",
+                    "errores_conversion": errores_conversion
+                }, status_code=400)
+
+        # Formatear los datos para la tabla movimientos
+        resultado_formateo = formatear_datos_para_movimientos(contenido_str)
+        movimientos_formateados = resultado_formateo.get("movimientos_formateados", [])
+
+        if not movimientos_formateados:
+            return JSONResponse(content={
+                "message": "No se encontraron movimientos válidos para guardar."
+            }, status_code=400)
+
+        # Guardar los movimientos en la base de datos (opcional)
+        # Aquí podrías agregar lógica para insertar los movimientos en la base de datos
+
+        return JSONResponse(content={
+            "message": "Archivo procesado exitosamente.",
+            "movimientos": movimientos
+        })
+
+    except Exception as e:
+        # Log para capturar errores generales
+        # print(f"Error general en upload_individual: {str(e)}")
+        return HTTPException(status_code=500, detail=f"Error al procesar el archivo: {str(e)}")
 
