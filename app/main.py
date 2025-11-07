@@ -3,11 +3,12 @@ from fastapi.staticfiles import StaticFiles
 from app.api import routes_conciliacion, routes_empresas
 from pathlib import Path
 
-from app.api import routes_conciliacion, routes_empresas
+from app.api import routes_conciliacion, routes_empresas, routes_informes
 from app.web import router_conciliaciones, router_home
 from app.web import router_empresas
 from .database import Base, engine, SessionLocal
 from .models import Empresa
+
 
 # create DB tables
 Base.metadata.create_all(bind=engine)
@@ -21,6 +22,7 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # Include routers
 app.include_router(routes_conciliacion.router, prefix="/api/conciliaciones", tags=["conciliaciones"])
 app.include_router(routes_empresas.router, prefix="/api/empresas", tags=["empresas"])
+app.include_router(routes_informes.router, prefix="/api/informes", tags=["Informes"])
 
 
 # Registrar rutas WEB

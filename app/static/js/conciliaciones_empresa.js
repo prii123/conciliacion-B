@@ -61,12 +61,36 @@ function generateTable(conciliaciones) {
                             <a href="/conciliaciones/detalle/${c.id}" class="btn btn-sm btn-outline-primary"> 
                                 <i class="bi bi-eye"></i> Ver Detalle
                             </a>
+                            <button class="btn btn-sm btn-outline-success" onclick="generarInforme(${c.id})">
+                                <i class="bi bi-file-earmark-pdf"></i> Informe
+                            </button>
                         </td>
                     </tr>
                 `).join("")}
             </tbody>
         </table>
     `;
+}
+
+window.generarInforme = async function (conciliacionId) {
+    try {
+        const response = await fetch(`${BASE_URL}/api/informes/${conciliacionId}`);
+        if (!response.ok) {
+            throw new Error("Error al generar el informe");
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `informe_conciliacion_${conciliacionId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error("Error al generar el informe:", error);
+        alert("Hubo un error al generar el informe. Por favor, inténtelo de nuevo más tarde.");
+    }
 }
 
 // Fetch data on page load
