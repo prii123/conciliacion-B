@@ -1,6 +1,7 @@
 from fpdf import FPDF
 import os
 import time
+import threading
 
 def generar_pdf_informe(conciliacion_id, conciliados, pendientes):
     print("Generando PDF...")
@@ -223,13 +224,17 @@ def generar_pdf_informe(conciliacion_id, conciliados, pendientes):
     pdf.output(file_path)
 
     # Programar eliminación automática del archivo después de 20 segundos
-    # eliminar_pdf_despues_de_tiempo(file_path, 20)
+    eliminar_pdf_despues_de_tiempo(file_path, 20)
 
     return file_path
 
 def eliminar_pdf_despues_de_tiempo(file_path, delay):
-    """Elimina un archivo PDF después de un tiempo especificado."""
-    time.sleep(delay)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        print(f"El archivo {file_path} ha sido eliminado automáticamente.")
+    """Elimina un archivo PDF después de un tiempo especificado en un subproceso."""
+    def eliminar():
+        time.sleep(delay)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"El archivo {file_path} ha sido eliminado automáticamente.")
+
+    # Crear y ejecutar un subproceso para la eliminación
+    threading.Thread(target=eliminar, daemon=True).start()
