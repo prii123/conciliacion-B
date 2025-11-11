@@ -97,7 +97,7 @@
             <div class="card mb-4 shadow-sm" id="archivoIndividualSection" style="display: none;">
                 <div class="card-body">
                     <h5><i class="bi bi-file-earmark me-2"></i>Subir Archivo Individual</h5>
-                    <p>Seleccione la empresa y la conciliación en proceso, luego cargue el archivo.</p>
+                    <p>Seleccione la empresa, especifique la cuenta bancaria y luego cargue el archivo.</p>
 
                     <div class="row">
                         <div class="col-md-6">
@@ -109,13 +109,11 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="conciliacion_individual" class="form-label">
-                                <i class="bi bi-list-check me-2"></i>Conciliación en Proceso
+                            <label for="cuenta_bancaria_individual" class="form-label">
+                                <i class="bi bi-credit-card me-2"></i>Cuenta Bancaria Conciliada
                             </label>
-                            <select class="form-select" name="conciliacion_individual" id="conciliacion_individual"
-                                required>
-                                <option value="">Seleccione una conciliación</option>
-                            </select>
+                            <input type="text" class="form-control" id="cuenta_bancaria_individual" name="cuenta_bancaria_individual" 
+                                   placeholder="Ej: Cuenta Corriente 123" required>
                         </div>
                     </div>
 
@@ -129,7 +127,7 @@
                         <i class="bi bi-upload me-2"></i>Subir Archivo
                     </button>
                 </div>
-            </div>
+            </div> 
 
             <!-- ================== INFO ================== -->
             <div class="info-card mt-4">

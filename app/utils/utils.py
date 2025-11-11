@@ -41,9 +41,9 @@ def validar_excel(df, nombre_archivo, tipo_archivo):
     Args:
         df: DataFrame a validar
         nombre_archivo: Nombre del archivo para identificación
-        tipo_archivo: Tipo de archivo (BANCO o AUXILIAR)
+        tipo_archivo: Tipo de archivo (BANCO, AUXILIAR o MOVIMIENTOS)
     """
-    columnas_requeridas = ['fecha', 'descripcion', 'valor']
+    columnas_requeridas = ['fecha', 'descripcion', 'valor', 'es']
     
     # 1. Validar que el DataFrame no esté vacío
     if df.empty:
@@ -105,86 +105,105 @@ def validar_excel(df, nombre_archivo, tipo_archivo):
     except Exception as e:
         raise ValueError(f"Error al validar la columna 'valor': {str(e)}")
     
-    # 7. Validar que haya al menos una fila de datos
+    # 7. Validar la columna 'es' (Entrada/Salida)
+    es_nulas = df[df['es'].isnull()]
+    if not es_nulas.empty:
+        filas_es_nulas = (es_nulas.index + 2).tolist()
+        raise ValueError(
+            f"La columna 'es' tiene valores vacíos en las filas: {filas_es_nulas}"
+        )
+    
+    # Validar que los valores de 'es' sean solo 'E' o 'S'
+    valores_es_validos = ['E', 'S', 'e', 's']  # Aceptar mayúsculas y minúsculas
+    valores_es_invalidos = df[~df['es'].str.upper().isin(['E', 'S'])]
+    if not valores_es_invalidos.empty:
+        filas_es_invalidas = (valores_es_invalidos.index + 2).tolist()
+        valores_problematicos = df.loc[valores_es_invalidos.index, 'es'].tolist()
+        raise ValueError(
+            f"La columna 'es' contiene valores inválidos en las filas: {filas_es_invalidas}. "
+            f"Valores problemáticos: {valores_problematicos}. Solo se permiten 'E' (Entrada) o 'S' (Salida)"
+        )
+    
+    # 8. Validar que haya al menos una fila de datos
     if len(df) == 0:
         raise ValueError("El archivo no contiene filas de datos")
     
     print(f"✓ Archivo {tipo_archivo} ({nombre_archivo}) validado exitosamente: {len(df)} registros encontrados")
-    """
-    Función mejorada para validar las columnas y tipos de datos del DataFrame.
+    # """
+    # Función mejorada para validar las columnas y tipos de datos del DataFrame.
     
-    Args:
-        df: DataFrame a validar
-        nombre_archivo: Nombre del archivo para identificación
-        tipo_archivo: Tipo de archivo (BANCO o AUXILIAR)
-    """
-    columnas_requeridas = ['fecha', 'descripcion', 'valor']
+    # Args:
+    #     df: DataFrame a validar
+    #     nombre_archivo: Nombre del archivo para identificación
+    #     tipo_archivo: Tipo de archivo (BANCO o AUXILIAR)
+    # """
+    # columnas_requeridas = ['fecha', 'descripcion', 'valor']
     
-    # 1. Validar que el DataFrame no esté vacío
-    if df.empty:
-        raise ValueError(f"El archivo está vacío o no contiene datos")
+    # # 1. Validar que el DataFrame no esté vacío
+    # if df.empty:
+    #     raise ValueError(f"El archivo está vacío o no contiene datos")
     
-    # 2. Validar que las columnas existan
-    columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
-    if columnas_faltantes:
-        columnas_disponibles = list(df.columns)
-        raise ValueError(
-            f"Faltan las siguientes columnas requeridas: {', '.join(columnas_faltantes)}. "
-            f"Columnas disponibles en el archivo: {', '.join(columnas_disponibles)}"
-        )
+    # # 2. Validar que las columnas existan
+    # columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
+    # if columnas_faltantes:
+    #     columnas_disponibles = list(df.columns)
+    #     raise ValueError(
+    #         f"Faltan las siguientes columnas requeridas: {', '.join(columnas_faltantes)}. "
+    #         f"Columnas disponibles en el archivo: {', '.join(columnas_disponibles)}"
+    #     )
     
-    # 3. Validar que no haya filas completamente vacías
-    filas_vacias = df[df[columnas_requeridas].isnull().all(axis=1)]
-    if not filas_vacias.empty:
-        indices_vacias = (filas_vacias.index + 2).tolist()  # +2 porque Excel cuenta desde 1 y tiene encabezados
-        raise ValueError(
-            f"Se encontraron filas completamente vacías en las posiciones: {indices_vacias}"
-        )
+    # # 3. Validar que no haya filas completamente vacías
+    # filas_vacias = df[df[columnas_requeridas].isnull().all(axis=1)]
+    # if not filas_vacias.empty:
+    #     indices_vacias = (filas_vacias.index + 2).tolist()  # +2 porque Excel cuenta desde 1 y tiene encabezados
+    #     raise ValueError(
+    #         f"Se encontraron filas completamente vacías en las posiciones: {indices_vacias}"
+    #     )
     
-    # 4. Validar la columna 'fecha'
-    fechas_nulas = df[df['fecha'].isnull()]
-    if not fechas_nulas.empty:
-        filas_fechas_nulas = (fechas_nulas.index + 2).tolist()
-        raise ValueError(
-            f"La columna 'fecha' tiene valores vacíos en las filas: {filas_fechas_nulas}"
-        )
+    # # 4. Validar la columna 'fecha'
+    # fechas_nulas = df[df['fecha'].isnull()]
+    # if not fechas_nulas.empty:
+    #     filas_fechas_nulas = (fechas_nulas.index + 2).tolist()
+    #     raise ValueError(
+    #         f"La columna 'fecha' tiene valores vacíos en las filas: {filas_fechas_nulas}"
+    #     )
     
-    # 5. Validar la columna 'descripcion'
-    descripciones_nulas = df[df['descripcion'].isnull()]
-    if not descripciones_nulas.empty:
-        filas_descripciones_nulas = (descripciones_nulas.index + 2).tolist()
-        raise ValueError(
-            f"La columna 'descripcion' tiene valores vacíos en las filas: {filas_descripciones_nulas}"
-        )
+    # # 5. Validar la columna 'descripcion'
+    # descripciones_nulas = df[df['descripcion'].isnull()]
+    # if not descripciones_nulas.empty:
+    #     filas_descripciones_nulas = (descripciones_nulas.index + 2).tolist()
+    #     raise ValueError(
+    #         f"La columna 'descripcion' tiene valores vacíos en las filas: {filas_descripciones_nulas}"
+    #     )
     
-    # 6. Validar que la columna 'valor' sea numérica
-    try:
-        # Crear una copia para no modificar el DataFrame original durante la validación
-        valores_temp = pd.to_numeric(df['valor'], errors='coerce')
-        valores_nulos = df[valores_temp.isnull()]
+    # # 6. Validar que la columna 'valor' sea numérica
+    # try:
+    #     # Crear una copia para no modificar el DataFrame original durante la validación
+    #     valores_temp = pd.to_numeric(df['valor'], errors='coerce')
+    #     valores_nulos = df[valores_temp.isnull()]
         
-        if not valores_nulos.empty:
-            filas_no_numericas = (valores_nulos.index + 2).tolist()
-            valores_problematicos = df.loc[valores_nulos.index, 'valor'].tolist()
-            raise ValueError(
-                f"La columna 'valor' contiene valores no numéricos en las filas: {filas_no_numericas}. "
-                f"Valores problemáticos: {valores_problematicos}"
-            )
+    #     if not valores_nulos.empty:
+    #         filas_no_numericas = (valores_nulos.index + 2).tolist()
+    #         valores_problematicos = df.loc[valores_nulos.index, 'valor'].tolist()
+    #         raise ValueError(
+    #             f"La columna 'valor' contiene valores no numéricos en las filas: {filas_no_numericas}. "
+    #             f"Valores problemáticos: {valores_problematicos}"
+    #         )
             
-        # Validar que no haya valores cero (opcional, según las reglas de negocio)
-        valores_cero = df[df['valor'] == 0]
-        if not valores_cero.empty:
-            filas_cero = (valores_cero.index + 2).tolist()
-            print(f"Advertencia en {tipo_archivo}: Se encontraron valores cero en las filas: {filas_cero}")
+    #     # Validar que no haya valores cero (opcional, según las reglas de negocio)
+    #     valores_cero = df[df['valor'] == 0]
+    #     if not valores_cero.empty:
+    #         filas_cero = (valores_cero.index + 2).tolist()
+    #         print(f"Advertencia en {tipo_archivo}: Se encontraron valores cero en las filas: {filas_cero}")
             
-    except Exception as e:
-        raise ValueError(f"Error al validar la columna 'valor': {str(e)}")
+    # except Exception as e:
+    #     raise ValueError(f"Error al validar la columna 'valor': {str(e)}")
     
-    # 7. Validar que haya al menos una fila de datos
-    if len(df) == 0:
-        raise ValueError("El archivo no contiene filas de datos")
+    # # 7. Validar que haya al menos una fila de datos
+    # if len(df) == 0:
+    #     raise ValueError("El archivo no contiene filas de datos")
     
-    print(f"✓ Archivo {tipo_archivo} ({nombre_archivo}) validado exitosamente: {len(df)} registros encontrados")
+    # print(f"✓ Archivo {tipo_archivo} ({nombre_archivo}) validado exitosamente: {len(df)} registros encontrados")
 
 
 

@@ -3,7 +3,7 @@ import { BASE_URL } from "./config.js";
 document.addEventListener('DOMContentLoaded', function () {
         FileHandler.init('file_banco', 'label_banco', 'name_banco');
         FileHandler.init('file_auxiliar', 'label_auxiliar', 'name_auxiliar');
-        FileHandler.init('archivo_individual', 'label_archivo_individual', 'name_archivo_individual');
+        FileHandler.init('file_archivo_individual', 'label_archivo_individual', 'name_archivo_individual');
     });
 
 
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     FileHandler.init('file_banco', 'label_banco', 'name_banco');
     FileHandler.init('file_auxiliar', 'label_auxiliar', 'name_auxiliar');
 
-    FileHandler.init('archivo_individual', 'label_archivo_individual', 'name_archivo_individual');
+    FileHandler.init('file_archivo_individual', 'label_archivo_individual', 'name_archivo_individual');
     // Manejar el evento de envío del formulario
     const uploadForm = document.getElementById("uploadForm");
     if (uploadForm) {
@@ -90,27 +90,30 @@ document.addEventListener("DOMContentLoaded", async () => {
             selectEmpresaIndividual.appendChild(option);
         });
 
-        selectEmpresaIndividual.addEventListener("change", async () => {
-            const empresaId = selectEmpresaIndividual.value;
-            if (!empresaId) return;
+        // selectEmpresaIndividual.addEventListener("change", async () => {
+        //     const empresaId = selectEmpresaIndividual.value;
+        //     if (!empresaId) return;
 
-            try {
-                const responseConciliaciones = await fetch(`${BASE_URL}/api/empresas/${empresaId}/conciliaciones`);
-                if (!responseConciliaciones.ok) throw new Error("Error al cargar conciliaciones");
-                const conciliacionesData = await responseConciliaciones.json();
+        //     try {
+        //         const responseConciliaciones = await fetch(`${BASE_URL}/api/empresas/${empresaId}/conciliaciones`);
+        //         if (!responseConciliaciones.ok) throw new Error("Error al cargar conciliaciones");
+        //         const conciliacionesData = await responseConciliaciones.json();
 
-                const conciliaciones = Array.isArray(conciliacionesData) ? conciliacionesData : conciliacionesData.conciliaciones || [];
-                selectConciliacionIndividual.innerHTML = '<option value="">Seleccione una conciliación</option>';
-                conciliaciones.forEach(conc => {
-                    const option = document.createElement("option");
-                    option.value = conc.id;
-                    option.textContent = conc.nombre;
-                    selectConciliacionIndividual.appendChild(option);
-                });
-            } catch (error) {
-                console.error("Error al cargar conciliaciones:", error);
-            }
-        });
+        //         console.log("Datos de conciliaciones:", conciliacionesData); // Debug
+
+        //         // La API devuelve { empresa: {...}, en_proceso: [...], finalizadas: [...] }
+        //         const conciliaciones = conciliacionesData.en_proceso || [];
+        //         selectConciliacionIndividual.innerHTML = '<option value="">Seleccione una conciliación</option>';
+        //         conciliaciones.forEach(conc => {
+        //             const option = document.createElement("option");
+        //             option.value = conc.id;
+        //             option.textContent = `${conc.mes_conciliado}/${conc.año_conciliado} - ${conc.cuenta_conciliada}`;
+        //             selectConciliacionIndividual.appendChild(option);
+        //         });
+        //     } catch (error) {
+        //         console.error("Error al cargar conciliaciones:", error);
+        //     }
+        // });
     } catch (error) {
         console.error("Error al cargar empresas:", error);
     }
@@ -120,17 +123,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (uploadIndividualBtn) {
         uploadIndividualBtn.addEventListener("click", async () => {
             const empresaId = selectEmpresaIndividual.value;
-            const conciliacionId = selectConciliacionIndividual.value;
-            const archivoInput = document.getElementById("archivo_individual");
+            const cuentaBancaria = document.getElementById("cuenta_bancaria_individual").value.trim();
+            const archivoInput = document.getElementById("file_archivo_individual"); // ID correcto del macro
 
-            if (!empresaId  || !archivoInput.files.length) { //|| !conciliacionId
-                alert("Por favor complete todos los campos antes de subir el archivo.");
+            // Verificar que todos los campos obligatorios estén completos
+            if (!empresaId) {
+                alert("Por favor seleccione una empresa.");
+                return;
+            }
+
+            if (!cuentaBancaria) {
+                alert("Por favor ingrese la cuenta bancaria conciliada.");
+                return;
+            }
+
+            if (!archivoInput) {
+                alert("Error: No se puede encontrar el elemento del archivo.");
+                return;
+            }
+
+            if (!archivoInput.files || !archivoInput.files.length) {
+                alert("Por favor seleccione un archivo.");
                 return;
             }
 
             const formData = new FormData();
             formData.append("empresa_id", empresaId);
-            formData.append("conciliacion_id", conciliacionId);
+            formData.append("cuenta_conciliada", cuentaBancaria);
             formData.append("archivo", archivoInput.files[0]);
 
             try {
@@ -143,10 +162,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 if (!response.ok) {
                     console.error("Errores al cargar archivo individual:", result);
-                    alert(`Error: ${result.error || "Error desconocido"}`);
+                    alert(`Error: ${result.detail || result.message || "Error desconocido"}`);
                 } else {
                     console.log("Archivo individual cargado exitosamente:", result);
                     alert("Archivo cargado exitosamente.");
+                    window.location.reload();
                 }
             } catch (error) {
                 console.error("Error al subir archivo individual:", error);

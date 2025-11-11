@@ -40,6 +40,18 @@ def matches_conciliacion(request: Request, conciliacion_id: int):
         "conciliacion": {"id": conciliacion_id}
     })
 
+@router.get("/agregar_movimientos/{conciliacion_id}", name="agregar_movimientos")
+def agregar_movimientos(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    return templates.TemplateResponse("agregar_movimientos.html", {
+        "request": request,
+        "conciliacion_id": conciliacion_id,
+        "conciliacion": conciliacion
+    })
+
 
 @router.get('/descargar_plantilla')
 def descargar_plantilla():

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% import "macros.html" as macros %}
+
+{% block title %}Agregar Movimientos - Conciliación #{{ conciliacion.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>Agregar Movimientos
+                    </h1>
+                    <small class="text-muted">Conciliación #{{ conciliacion.id }} - {{ conciliacion.cuenta_conciliada }} ({{ conciliacion.mes_conciliado }}/{{ conciliacion.año_conciliado }})</small>
+                </div>
+                <a href="/conciliaciones/detalle/{{ conciliacion.id }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Volver al Detalle
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-upload me-2"></i>Subir Archivo de Movimientos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Contenedor para alertas -->
+                    <div id="alert-container" class="mb-3"></div>
+                    
+                    <!-- Agregar el ID de conciliación como atributo de datos -->
+                    <div data-conciliacion-id="{{ conciliacion.id }}" style="display: none;"></div>
+                    
+                    <form id="upload-form" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ macros.file_input('archivo', 'Archivo Excel (.xlsx)', 'file-earmark-spreadsheet') }}
+                                    <div class="form-text">
+                                        El archivo debe contener las columnas: fecha, descripcion, valor, es
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tipo_movimiento" class="form-label">Tipo de Movimiento</label>
+                                    <select class="form-select" id="tipo_movimiento" name="tipo_movimiento" required>
+                                        <option value="">Seleccione el tipo</option>
+                                        <option value="banco">Banco</option>
+                                        <option value="auxiliar">Auxiliar</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" class="btn btn-outline-secondary me-md-2" onclick="window.history.back()">
+                                <i class="bi bi-x-circle me-2"></i>Cancelar
+                            </button>
+                            <button type="submit" class="btn btn-primary" disabled>
+                                <i class="bi bi-upload me-2"></i>Subir Movimientos
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Área de resultados -->
+            <div id="resultado-container" class="mt-4" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-check-circle me-2"></i>Resultado de la Carga
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resultado-mensaje"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/main.js"></script>
+<script src="/static/js/agregar_movimientos.js" type="module"></script>
+{% endblock %}

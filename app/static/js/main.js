@@ -95,8 +95,18 @@ const FileHandler = {
     updateFileLabel(input, label, nameDiv) {
         if (input.files && input.files[0]) {
             label.classList.add('has-file');
-            nameDiv.textContent = '✓ ' + input.files[0].name;
-            nameDiv.style.color = 'var(--success-color)';
+            
+            // Aplicar estilos verdes cuando se selecciona un archivo
+            label.style.backgroundColor = '#d4edda';
+            label.style.borderColor = '#28a745';
+            label.style.color = '#155724';
+            
+            // Mostrar ícono de éxito y nombre del archivo
+            nameDiv.innerHTML = `
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                ${input.files[0].name}
+            `;
+            nameDiv.style.color = '#155724';
         }
     },
 

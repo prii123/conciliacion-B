@@ -39,12 +39,24 @@
                     </form>
                 </div>
 
-                <div class="col-md-6">
+                <div class="info-row">
                     <form id="terminar-conciliacion-form" method="post">
                         <button type="submit" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-repeat me-2"></i> Terminar conciliación
+                            <i class="bi bi-check-circle me-2"></i> Terminar conciliación
                         </button>
                     </form>
+                </div>
+
+                <div class="info-row">
+                    <a href="/conciliaciones/agregar_movimientos/{{ conciliacion.id }}" class="btn btn-outline-primary">
+                        <i class="bi bi-plus-circle me-2"></i> Agregar movimientos
+                    </a>
+                </div>
+
+                <div class="info-row">
+                    <button type="button" class="btn btn-outline-danger" id="eliminar-conciliacion-btn" onclick="return confirm('¿Está seguro de eliminar esta conciliación? Esta acción no se puede deshacer.')">
+                        <i class="bi bi-trash me-2"></i> Eliminar conciliación
+                    </button>
                 </div>
             </div>
         </div>

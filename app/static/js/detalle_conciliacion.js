@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            console.log("Detalles de la conciliación cargados:", data);
+            // console.log("Detalles de la conciliación cargados:", data);
             // console.log("Movimientos no conciliados (banco):", data.movimientos_no_conciliados.banco);
             // console.log("Movimientos no conciliados (auxiliar):", data.movimientos_no_conciliados.auxiliar);
             // console.log("Movimientos conciliados:", data.movimientos_conciliados);
@@ -417,6 +417,35 @@ document.addEventListener('DOMContentLoaded', () => {
             // console.log('Seleccionados auxiliar:', seleccionAuxiliar);
         }
     });
+
+    // Event listener para eliminar conciliación
+    const eliminarConciliacionBtn = document.getElementById('eliminar-conciliacion-btn');
+    if (eliminarConciliacionBtn) {
+        eliminarConciliacionBtn.addEventListener('click', async (event) => {
+            event.preventDefault();
+            
+            if (!confirm('¿Está seguro de eliminar esta conciliación? Esta acción eliminará la conciliación y todos sus datos asociados de forma permanente y no se puede deshacer.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/eliminar`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    // alert('Conciliación eliminada exitosamente');
+                    window.location.href = '/conciliaciones';
+                } else {
+                    const errorData = await response.json();
+                    // alert(`Error al eliminar la conciliación: ${errorData.detail}`);
+                }
+            } catch (error) {
+                console.error('Error al eliminar la conciliación:', error);
+                alert('Error al eliminar la conciliación. Por favor, inténtelo de nuevo.');
+            }
+        });
+    }
 });
 
 function renderConciliacionDetails(data) {
