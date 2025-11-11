@@ -84,8 +84,8 @@ class AgregarMovimientos {
         const submitBtn = document.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
         
-        console.log('Enviando formulario con ID de conciliación:', conciliacionId);
-        console.log('URL completa que se va a usar:', `${BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`);
+        // console.log('Enviando formulario con ID de conciliación:', conciliacionId);
+        // console.log('URL completa que se va a usar:', `${BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`);
         
         // Mostrar estado de carga
         submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Procesando...';

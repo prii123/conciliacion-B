@@ -391,8 +391,23 @@ async def agregar_movimientos_a_conciliacion(
         contenido = await archivo.read()
         df = pd.read_excel(io.BytesIO(contenido))
         
-        # Validar formato de fecha
-        df['fecha'] = pd.to_datetime(df['fecha'], format='%d-%m-%Y', errors='coerce').dt.strftime('%Y-%m-%d')
+        # Normalizar nombres de columnas a minúsculas
+        df.columns = df.columns.str.lower().str.strip()
+        
+        # Validar formato de fecha - intentar múltiples formatos
+        try:
+            # Primero intentar con formato DD/MM/YYYY
+            df['fecha'] = pd.to_datetime(df['fecha'], format='%d/%m/%Y', errors='coerce')
+        except:
+            try:
+                # Si falla, intentar con formato DD-MM-YYYY
+                df['fecha'] = pd.to_datetime(df['fecha'], format='%d-%m-%Y', errors='coerce')
+            except:
+                # Si falla, usar inferencia automática
+                df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')
+        
+        # Convertir a formato estándar YYYY-MM-DD
+        df['fecha'] = df['fecha'].dt.strftime('%Y-%m-%d')
         df.dropna(subset=['fecha'], inplace=True)
         
         # Validar archivo
@@ -422,6 +437,7 @@ async def agregar_movimientos_a_conciliacion(
         })
         
     except Exception as e:
+        print(f"Error al agregar movimientos: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error al procesar el archivo: {str(e)}")
 
 
