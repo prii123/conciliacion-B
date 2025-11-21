@@ -15,6 +15,7 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ ERROR: Python no está instalado o no está en PATH
     echo Por favor instale Python 3.7 o superior
+    echo 🔍 Ejecute 'diagnostico.bat' para más información
     pause
     exit /b 1
 )
@@ -42,9 +43,14 @@ call venv\Scripts\activate.bat
 
 :: Verificar si requirements.txt existe
 if not exist "requirements.txt" (
-    echo ❌ ERROR: No se encontró el archivo requirements.txt
-    pause
-    exit /b 1
+    if exist "requirements-simple.txt" (
+        echo ⚠ Usando requirements simplificados
+        copy "requirements-simple.txt" "requirements.txt" >nul 2>&1
+    ) else (
+        echo ❌ ERROR: No se encontró ningún archivo de requirements
+        pause
+        exit /b 1
+    )
 )
 
 :: Instalar/actualizar dependencias
@@ -53,15 +59,46 @@ call :mostrar_progreso "Configurando dependencias"
 echo 📦 Actualizando pip...
 venv\Scripts\python.exe -m pip install --upgrade pip --quiet >nul 2>&1
 
-echo 📦 Instalando dependencias...
+::echo 📦 Instalando dependencias...
 venv\Scripts\python.exe -m pip install python-multipart fpdf2 --quiet >nul 2>&1
-venv\Scripts\python.exe -m pip install -r requirements.txt --quiet >nul 2>&1
+
+echo 📦 Instalando dependencias principales...
+venv\Scripts\python.exe -m pip install fastapi uvicorn[standard] sqlalchemy python-dotenv jinja2 --quiet >nul 2>&1
+
+echo 📦 Instalando dependencias de datos...
+:: Instalar pandas desde wheel precompilado para evitar problemas de compilación
+venv\Scripts\python.exe -m pip install --only-binary=all pandas openpyxl numpy --quiet >nul 2>&1
+
+echo 📦 Instalando dependencias restantes...
+venv\Scripts\python.exe -m pip install -r requirements.txt --only-binary=all --quiet >nul 2>&1
 
 if %errorlevel% neq 0 (
-    echo ❌ ERROR: No se pudieron instalar las dependencias
-    echo Intentando instalación manual...
-    venv\Scripts\python.exe -m pip install -r requirements.txt
+    echo ⚠ Algunos paquetes necesitaron instalación manual...
+    echo 📦 Instalando paquetes críticos individualmente...
+    
+    :: Instalar FastAPI y sus dependencias core
+    venv\Scripts\python.exe -m pip install fastapi uvicorn
     if %errorlevel% neq 0 (
+        echo ❌ ERROR: No se pudo instalar FastAPI
+        pause
+        exit /b 1
+    )
+    
+    :: Instalar pandas con método alternativo
+    echo 📦 Instalando pandas (esto puede tomar unos minutos)...
+    venv\Scripts\python.exe -m pip install --prefer-binary pandas
+    if %errorlevel% neq 0 (
+        echo ⚠ Probando instalación de pandas sin dependencias de compilación...
+        venv\Scripts\python.exe -m pip install --no-deps pandas
+        if %errorlevel% neq 0 (
+            echo ❌ WARNING: No se pudo instalar pandas. Funcionalidad limitada.
+        )
+    )
+    
+    :: Instalar SQLAlchemy y otras dependencias críticas
+    venv\Scripts\python.exe -m pip install sqlalchemy python-multipart fpdf2 openpyxl jinja2 python-dotenv
+    if %errorlevel% neq 0 (
+        echo ❌ ERROR: No se pudieron instalar dependencias críticas
         pause
         exit /b 1
     )
@@ -69,6 +106,30 @@ if %errorlevel% neq 0 (
 
 echo.
 echo ✅ Configuración completada
+echo 🔍 Verificando instalación...
+
+:: Verificar que FastAPI esté disponible
+venv\Scripts\python.exe -c "import fastapi; print('✓ FastAPI instalado correctamente')" 2>nul
+if %errorlevel% neq 0 (
+    echo ❌ ERROR: FastAPI no está disponible
+    pause
+    exit /b 1
+)
+
+:: Verificar uvicorn
+venv\Scripts\python.exe -c "import uvicorn; print('✓ Uvicorn instalado correctamente')" 2>nul
+if %errorlevel% neq 0 (
+    echo ❌ ERROR: Uvicorn no está disponible
+    pause
+    exit /b 1
+)
+
+:: Verificar pandas (opcional)
+venv\Scripts\python.exe -c "import pandas; print('✓ Pandas disponible')" 2>nul
+if %errorlevel% neq 0 (
+    echo ⚠ WARNING: Pandas no disponible - funcionalidad limitada
+)
+
 echo ==========================================
 echo    🚀 Iniciando servidor 
 echo ==========================================
