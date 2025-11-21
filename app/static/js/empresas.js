@@ -142,9 +142,9 @@ const EmpresasManager = {
         tr.appendChild(tdRazon);
 
         // Nombre Comercial
-        const tdNombre = document.createElement('td');
-        tdNombre.textContent = empresa.nombre_comercial || '-';
-        tr.appendChild(tdNombre);
+        // const tdNombre = document.createElement('td');
+        // tdNombre.textContent = empresa.nombre_comercial || '-';
+        // tr.appendChild(tdNombre);
 
         // Ciudad
         const tdCiudad = document.createElement('td');

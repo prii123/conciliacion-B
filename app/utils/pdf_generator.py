@@ -3,8 +3,16 @@ import os
 import time
 import threading
 
-def generar_pdf_informe(conciliacion_id, conciliados, pendientes):
+def generar_pdf_informe(conciliacion, conciliados, pendientes):
     print("Generando PDF...")
+
+    # Obtener información de la empresa
+    empresa_nombre = conciliacion.empresa.razon_social if conciliacion.empresa and conciliacion.empresa.razon_social else (
+        conciliacion.empresa.nombre_comercial if conciliacion.empresa else 'Empresa no especificada'
+    )
+    
+    periodo = f"{conciliacion.mes_conciliado} {conciliacion.año_conciliado}" if conciliacion.mes_conciliado and conciliacion.año_conciliado else "Período no especificado"
+    cuenta = conciliacion.cuenta_conciliada if conciliacion.cuenta_conciliada else "Cuenta no especificada"
 
     # Separar los movimientos conciliados y pendientes por tipo
     conciliados_bancos = [mov for mov in conciliados if mov.tipo == "banco"]
@@ -12,24 +20,33 @@ def generar_pdf_informe(conciliacion_id, conciliados, pendientes):
     pendientes_bancos = [mov for mov in pendientes if mov.tipo == "banco"]
     pendientes_auxiliares = [mov for mov in pendientes if mov.tipo == "auxiliar"]
 
-    # Separar los movimientos pendientes y conciliados en entradas y salidas
-    pendientes_auxiliares_entradas = [mov for mov in pendientes_auxiliares if mov.valor > 0]
-    pendientes_auxiliares_salidas = [mov for mov in pendientes_auxiliares if mov.valor < 0]
-    conciliados_auxiliares_entradas = [mov for mov in conciliados_auxiliares if mov.valor > 0]
-    conciliados_auxiliares_salidas = [mov for mov in conciliados_auxiliares if mov.valor < 0]
+    # CORRECCIÓN: Separar por mov.es en lugar de mov.valor
+    # Separar los movimientos pendientes y conciliados en entradas (E) y salidas (S)
+    pendientes_auxiliares_entradas = [mov for mov in pendientes_auxiliares if mov.es == "E"]
+    pendientes_auxiliares_salidas = [mov for mov in pendientes_auxiliares if mov.es == "S"]
+    conciliados_auxiliares_entradas = [mov for mov in conciliados_auxiliares if mov.es == "E"]
+    conciliados_auxiliares_salidas = [mov for mov in conciliados_auxiliares if mov.es == "S"]
 
-    pendientes_bancos_entradas = [mov for mov in pendientes_bancos if mov.valor > 0]
-    pendientes_bancos_salidas = [mov for mov in pendientes_bancos if mov.valor < 0]
-    conciliados_bancos_entradas = [mov for mov in conciliados_bancos if mov.valor > 0]
-    conciliados_bancos_salidas = [mov for mov in conciliados_bancos if mov.valor < 0]
+    pendientes_bancos_entradas = [mov for mov in pendientes_bancos if mov.es == "E"]
+    pendientes_bancos_salidas = [mov for mov in pendientes_bancos if mov.es == "S"]
+    conciliados_bancos_entradas = [mov for mov in conciliados_bancos if mov.es == "E"]
+    conciliados_bancos_salidas = [mov for mov in conciliados_bancos if mov.es == "S"]
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Times", size=12)  # Cambiar a Times New Roman
+    pdf.set_font("Times", size=16, style="B")  # Título más grande y en negrita
 
-    pdf.cell(200, 10, txt=f"Informe de Conciliación #{conciliacion_id}", ln=True, align="C")
-    pdf.ln(10)
+    # Encabezado principal con información completa
+    pdf.cell(200, 12, txt=f"Informe de Conciliación #{conciliacion.id}", ln=True, align="C")
+    pdf.ln(1)
+    
+    # Información de la empresa y período
+    pdf.set_font("Times", size=12, style="B")
+    pdf.cell(200, 8, txt=f"{empresa_nombre}", ln=True, align="C")
+    pdf.cell(200, 8, txt=f"Período: {periodo}", ln=True, align="C")
+    pdf.cell(200, 8, txt=f"Cuenta: {cuenta}", ln=True, align="C")
+    pdf.ln(5)
 
     # Estadísticas de movimientos conciliados y pendientes
     pdf.set_font("Times", size=10)
@@ -39,7 +56,7 @@ def generar_pdf_informe(conciliacion_id, conciliados, pendientes):
     # Estadísticas totales
     pdf.set_font("Times", size=10)
     pdf.cell(200, 10, txt="Estadísticas Totales", ln=True, align="L")
-    pdf.ln(5)
+    pdf.ln(1)
 
     # Tabla de estadísticas totales
     pdf.set_font("Times", size=9)
@@ -87,12 +104,12 @@ def generar_pdf_informe(conciliacion_id, conciliados, pendientes):
     pdf.cell(45, 5, txt=f"{total_bancos_salidas:,.2f}", border=1, align="C")
     pdf.cell(45, 5, txt=f"{pendientes_bancos_salidas_total:,.2f}", border=1, align="C")
     pdf.cell(45, 5, txt=f"{conciliados_bancos_salidas_total:,.2f}", border=1, align="C")
-    pdf.ln(5)
+    pdf.ln(10)
 
     # Estadísticas de registros (cantidad de movimientos)
     pdf.set_font("Times", size=10)
     pdf.cell(200, 10, txt="Estadísticas de Registros (Cantidad de Movimientos)", ln=True, align="L")
-    pdf.ln(5)
+    pdf.ln(1)
 
     # Tabla de estadísticas de registros
     pdf.set_font("Times", size=9)
@@ -143,84 +160,125 @@ def generar_pdf_informe(conciliacion_id, conciliados, pendientes):
     pdf.ln(10)
 
     # Tabla de movimientos pendientes de auxiliares - Entradas
+    pdf.set_font("Times", size=12, style="B")
     pdf.cell(200, 10, txt="Movimientos Pendientes - Auxiliares (Entradas)", ln=True, align="L")
     pdf.ln(5)
-    pdf.set_font("Times", size=9)
-    pdf.cell(50, 5, txt="Fecha", border=1, align="C")
-    pdf.cell(90, 5, txt="Descripción", border=1, align="C")
-    pdf.cell(40, 5, txt="Valor", border=1, align="C")
-    pdf.ln(5)
-    total_entradas_auxiliares = 0
-    for mov in pendientes_auxiliares_entradas:
-        pdf.cell(50, 5, txt=mov.fecha, border=1, align="C")
-        pdf.cell(90, 5, txt=mov.descripcion, border=1, align="C")
-        pdf.cell(40, 5, txt=f"{mov.valor:,.2f}", border=1, align="C")
+    
+    if pendientes_auxiliares_entradas:
+        pdf.set_font("Times", size=9)
+        pdf.cell(30, 5, txt="Fecha", border=1, align="C")
+        pdf.cell(80, 5, txt="Descripción", border=1, align="C")
+        pdf.cell(30, 5, txt="Valor", border=1, align="C")
+        pdf.cell(30, 5, txt="E/S", border=1, align="C")
         pdf.ln(5)
-        total_entradas_auxiliares += mov.valor
-    pdf.cell(170, 10, txt=f"Total Entradas Auxiliares: {total_entradas_auxiliares:,.2f}", ln=True, align="R")
+        total_entradas_auxiliares = 0
+        for mov in pendientes_auxiliares_entradas:
+            pdf.cell(30, 5, txt=mov.fecha, border=1, align="C")
+            # Limitar descripción para que quepa en el espacio
+            descripcion_corta = mov.descripcion[:40] + "..." if len(mov.descripcion) > 40 else mov.descripcion
+            pdf.cell(80, 5, txt=descripcion_corta, border=1, align="L")
+            pdf.cell(30, 5, txt=f"{mov.valor:,.2f}", border=1, align="R")
+            pdf.cell(30, 5, txt=mov.es, border=1, align="C")
+            pdf.ln(5)
+            total_entradas_auxiliares += mov.valor
+        pdf.set_font("Times", size=10, style="B")
+        pdf.cell(140, 8, txt=f"Total Entradas Auxiliares Pendientes: {total_entradas_auxiliares:,.2f}", ln=True, align="R")
+    else:
+        pdf.set_font("Times", size=10, style="I")
+        pdf.cell(200, 8, txt="No hay movimientos pendientes de auxiliares (Entradas)", ln=True, align="C")
 
     pdf.ln(10)
 
     # Tabla de movimientos pendientes de auxiliares - Salidas
+    pdf.set_font("Times", size=12, style="B")
     pdf.cell(200, 10, txt="Movimientos Pendientes - Auxiliares (Salidas)", ln=True, align="L")
     pdf.ln(5)
-    pdf.set_font("Times", size=9)
-    pdf.cell(50, 5, txt="Fecha", border=1, align="C")
-    pdf.cell(90, 5, txt="Descripción", border=1, align="C")
-    pdf.cell(40, 5, txt="Valor", border=1, align="C")
-    pdf.ln(5)
-    total_salidas_auxiliares = 0
-    for mov in pendientes_auxiliares_salidas:
-        pdf.cell(50, 5, txt=mov.fecha, border=1, align="C")
-        pdf.cell(90, 5, txt=mov.descripcion, border=1, align="C")
-        pdf.cell(40, 5, txt=f"{mov.valor:,.2f}", border=1, align="C")
+    
+    if pendientes_auxiliares_salidas:
+        pdf.set_font("Times", size=9)
+        pdf.cell(30, 5, txt="Fecha", border=1, align="C")
+        pdf.cell(80, 5, txt="Descripción", border=1, align="C")
+        pdf.cell(30, 5, txt="Valor", border=1, align="C")
+        pdf.cell(30, 5, txt="E/S", border=1, align="C")
         pdf.ln(5)
-        total_salidas_auxiliares += mov.valor
-    pdf.cell(170, 10, txt=f"Total Salidas Auxiliares: {total_salidas_auxiliares:,.2f}", ln=True, align="R")
+        total_salidas_auxiliares = 0
+        for mov in pendientes_auxiliares_salidas:
+            pdf.cell(30, 5, txt=mov.fecha, border=1, align="C")
+            descripcion_corta = mov.descripcion[:40] + "..." if len(mov.descripcion) > 40 else mov.descripcion
+            pdf.cell(80, 5, txt=descripcion_corta, border=1, align="L")
+            pdf.cell(30, 5, txt=f"{mov.valor:,.2f}", border=1, align="R")
+            pdf.cell(30, 5, txt=mov.es, border=1, align="C")
+            pdf.ln(5)
+            total_salidas_auxiliares += mov.valor
+        pdf.set_font("Times", size=10, style="B")
+        pdf.cell(140, 8, txt=f"Total Salidas Auxiliares Pendientes: {total_salidas_auxiliares:,.2f}", ln=True, align="R")
+    else:
+        pdf.set_font("Times", size=10, style="I")
+        pdf.cell(200, 8, txt="No hay movimientos pendientes de auxiliares (Salidas)", ln=True, align="C")
 
     pdf.ln(10)
 
     # Tabla de movimientos pendientes de bancos - Entradas
+    pdf.set_font("Times", size=12, style="B")
     pdf.cell(200, 10, txt="Movimientos Pendientes - Bancos (Entradas)", ln=True, align="L")
     pdf.ln(5)
-    pdf.set_font("Times", size=9)
-    pdf.cell(50, 5, txt="Fecha", border=1, align="C")
-    pdf.cell(90, 5, txt="Descripción", border=1, align="C")
-    pdf.cell(40, 5, txt="Valor", border=1, align="C")
-    pdf.ln(5)
-    total_entradas_bancos = 0
-    for mov in pendientes_bancos_entradas:
-        pdf.cell(50, 5, txt=mov.fecha, border=1, align="C")
-        pdf.cell(90, 5, txt=mov.descripcion, border=1, align="C")
-        pdf.cell(40, 5, txt=f"{mov.valor:,.2f}", border=1, align="C")
+    
+    if pendientes_bancos_entradas:
+        pdf.set_font("Times", size=9)
+        pdf.cell(30, 5, txt="Fecha", border=1, align="C")
+        pdf.cell(80, 5, txt="Descripción", border=1, align="C")
+        pdf.cell(30, 5, txt="Valor", border=1, align="C")
+        pdf.cell(30, 5, txt="E/S", border=1, align="C")
         pdf.ln(5)
-        total_entradas_bancos += mov.valor
-    pdf.cell(170, 10, txt=f"Total Entradas Bancos: {total_entradas_bancos:,.2f}", ln=True, align="R")
+        total_entradas_bancos = 0
+        for mov in pendientes_bancos_entradas:
+            pdf.cell(30, 5, txt=mov.fecha, border=1, align="C")
+            descripcion_corta = mov.descripcion[:40] + "..." if len(mov.descripcion) > 40 else mov.descripcion
+            pdf.cell(80, 5, txt=descripcion_corta, border=1, align="L")
+            pdf.cell(30, 5, txt=f"{mov.valor:,.2f}", border=1, align="R")
+            pdf.cell(30, 5, txt=mov.es, border=1, align="C")
+            pdf.ln(5)
+            total_entradas_bancos += mov.valor
+        pdf.set_font("Times", size=10, style="B")
+        pdf.cell(140, 8, txt=f"Total Entradas Bancos Pendientes: {total_entradas_bancos:,.2f}", ln=True, align="R")
+    else:
+        pdf.set_font("Times", size=10, style="I")
+        pdf.cell(200, 8, txt="No hay movimientos pendientes de bancos (Entradas)", ln=True, align="C")
 
     pdf.ln(10)
 
     # Tabla de movimientos pendientes de bancos - Salidas
+    pdf.set_font("Times", size=12, style="B")
     pdf.cell(200, 10, txt="Movimientos Pendientes - Bancos (Salidas)", ln=True, align="L")
     pdf.ln(5)
-    pdf.set_font("Times", size=9)
-    pdf.cell(50, 5, txt="Fecha", border=1, align="C")
-    pdf.cell(90, 5, txt="Descripción", border=1, align="C")
-    pdf.cell(40, 5, txt="Valor", border=1, align="C")
-    pdf.ln(5)
-    total_salidas_bancos = 0
-    for mov in pendientes_bancos_salidas:
-        pdf.cell(50, 5, txt=mov.fecha, border=1, align="C")
-        pdf.cell(90, 5, txt=mov.descripcion, border=1, align="C")
-        pdf.cell(40, 5, txt=f"{mov.valor:,.2f}", border=1, align="C")
+    
+    if pendientes_bancos_salidas:
+        pdf.set_font("Times", size=9)
+        pdf.cell(30, 5, txt="Fecha", border=1, align="C")
+        pdf.cell(80, 5, txt="Descripción", border=1, align="C")
+        pdf.cell(30, 5, txt="Valor", border=1, align="C")
+        pdf.cell(30, 5, txt="E/S", border=1, align="C")
         pdf.ln(5)
-        total_salidas_bancos += mov.valor
-    pdf.cell(170, 10, txt=f"Total Salidas Bancos: {total_salidas_bancos:,.2f}", ln=True, align="R")
+        total_salidas_bancos = 0
+        for mov in pendientes_bancos_salidas:
+            pdf.cell(30, 5, txt=mov.fecha, border=1, align="C")
+            descripcion_corta = mov.descripcion[:40] + "..." if len(mov.descripcion) > 40 else mov.descripcion
+            pdf.cell(80, 5, txt=descripcion_corta, border=1, align="L")
+            pdf.cell(30, 5, txt=f"{mov.valor:,.2f}", border=1, align="R")
+            pdf.cell(30, 5, txt=mov.es, border=1, align="C")
+            pdf.ln(5)
+            total_salidas_bancos += mov.valor
+        pdf.set_font("Times", size=10, style="B")
+        pdf.cell(140, 8, txt=f"Total Salidas Bancos Pendientes: {total_salidas_bancos:,.2f}", ln=True, align="R")
+    else:
+        pdf.set_font("Times", size=10, style="I")
+        pdf.cell(200, 8, txt="No hay movimientos pendientes de bancos (Salidas)", ln=True, align="C")
 
     pdf.ln(10)
 
     output_dir = "generated_reports"
     os.makedirs(output_dir, exist_ok=True)
-    file_path = os.path.join(output_dir, f"informe_conciliacion_{conciliacion_id}.pdf")
+    file_path = os.path.join(output_dir, f"informe_conciliacion_{conciliacion.id}.pdf")
     pdf.output(file_path)
 
     # Programar eliminación automática del archivo después de 20 segundos

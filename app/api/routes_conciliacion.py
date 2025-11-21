@@ -99,10 +99,15 @@ def detalle_conciliacion_json(conciliacion_id: int, db: Session = Depends(get_db
 
     movimientos_conciliados = movimientos_conciliados_automaticos + movimientos_conciliados_manuales
 
-    # Calcular estadísticas directamente desde la tabla Movimiento
-    total = len(movimientos)
-    conciliados = len(movimientos_conciliados)
+    # Calcular estadísticas directamente desde la tabla Movimiento (igual que en la lista)
+    total = db.query(Movimiento).filter(Movimiento.id_conciliacion == conciliacion_id).count()
+    conciliados = db.query(Movimiento).filter(
+        Movimiento.id_conciliacion == conciliacion_id,
+        Movimiento.estado_conciliacion == "conciliado"
+    ).count()
     pendientes = total - conciliados
+
+    # Calcular el porcentaje de conciliación
     porcentaje = int((conciliados / total) * 100) if total else 0
 
     stats = {

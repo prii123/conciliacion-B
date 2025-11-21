@@ -19,6 +19,6 @@ def generar_informe(conciliacion_id: int, db: Session = Depends(get_db)):
     conciliados = [m for m in movimientos if m.estado_conciliacion == "conciliado"]
     pendientes = [m for m in movimientos if m.estado_conciliacion == "no_conciliado"]
 
-    file_path = generar_pdf_informe(conciliacion_id, conciliados, pendientes)
+    file_path = generar_pdf_informe(conciliacion, conciliados, pendientes)
 
     return FileResponse(file_path, media_type="application/pdf", filename=f"informe_conciliacion_{conciliacion_id}.pdf")

@@ -3,6 +3,10 @@
 
 {% block title %}Detalle Conciliación #{{ conciliacion.id }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/detalle-conciliacion.css">
+{% endblock %}
+
 
 {% block content %}
 <div id="conciliaciones-container" data-conciliacion-id="{{ conciliacion.id }}">
@@ -10,7 +14,7 @@
 </div>
 
 <div class="mb-4">
-    <a href="/conciliaciones" class="btn btn-outline-secondary">
+    <a href="/conciliaciones" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left me-2"></i>Volver a Lista
     </a>
 </div>
@@ -33,7 +37,7 @@
                 </div>
                 <div class="info-row">
                     <form id="procesar-conciliacion-form" method="post">
-                        <button type="submit" class="btn btn-outline-secondary">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">
                             <i class="bi bi-arrow-repeat me-2"></i> Procesar conciliación Automáticamente
                         </button>
                     </form>
@@ -41,20 +45,20 @@
 
                 <div class="info-row">
                     <form id="terminar-conciliacion-form" method="post">
-                        <button type="submit" class="btn btn-outline-secondary">
+                        <button type="submit" class="btn btn-outline-success btn-sm">
                             <i class="bi bi-check-circle me-2"></i> Terminar conciliación
                         </button>
                     </form>
                 </div>
 
                 <div class="info-row">
-                    <a href="/conciliaciones/agregar_movimientos/{{ conciliacion.id }}" class="btn btn-outline-primary">
+                    <a href="/conciliaciones/agregar_movimientos/{{ conciliacion.id }}" class="btn btn-outline-info btn-sm">
                         <i class="bi bi-plus-circle me-2"></i> Agregar movimientos
                     </a>
                 </div>
 
                 <div class="info-row">
-                    <button type="button" class="btn btn-outline-danger" id="eliminar-conciliacion-btn" onclick="return confirm('¿Está seguro de eliminar esta conciliación? Esta acción no se puede deshacer.')">
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="eliminar-conciliacion-btn" onclick="return confirm('¿Está seguro de eliminar esta conciliación? Esta acción no se puede deshacer.')">
                         <i class="bi bi-trash me-2"></i> Eliminar conciliación
                     </button>
                 </div>
@@ -64,14 +68,14 @@
 </div>
 
 <div class="mb-4">
-    <a href="/conciliaciones/matches_conciliacion/{{ conciliacion.id }}" class="btn btn-primary">
+    <a href="/conciliaciones/matches_conciliacion/{{ conciliacion.id }}" class="btn btn-primary btn-sm">
         <i class="bi bi-link-45deg me-2"></i> Ver Matches de Conciliación
     </a> 
 </div>
 
 <div class="tabs-container">
-    <button id="btnOkBanco" class="btn btn-primary mt-2">Ir a Auxiliar</button>
-    <button id="btnConfirmarConciliacion" class="btn btn-success mt-2">Confirmar Conciliación</button>
+    <button id="btnOkBanco" class="btn btn-outline-info btn-sm mt-2">Ir a Auxiliar</button>
+    <button id="btnConfirmarConciliacion" class="btn btn-outline-success btn-sm mt-2">Confirmar Conciliación</button>
 
     <ul class="nav nav-tabs" id="movimientosTabs" role="tablist">
         <li class="nav-item" role="presentation">

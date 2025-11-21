@@ -113,8 +113,67 @@ body {
 }
 
 .btn-sm {
-    padding: 0.4rem 1rem;
-    font-size: 0.875rem;
+    padding: 0.375rem 0.875rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+/* Estilos suaves para botones outline */
+.btn-outline-secondary {
+    color: #6c757d;
+    border-color: #dee2e6;
+    background-color: transparent;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: #fff;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(108, 117, 125, 0.15);
+}
+
+.btn-outline-success {
+    color: #198754;
+    border-color: #d4edda;
+    background-color: transparent;
+}
+
+.btn-outline-success:hover {
+    background-color: #198754;
+    border-color: #198754;
+    color: #fff;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(25, 135, 84, 0.15);
+}
+
+.btn-outline-info {
+    color: #0dcaf0;
+    border-color: #cff4fc;
+    background-color: transparent;
+}
+
+.btn-outline-info:hover {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+    color: #000;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(13, 202, 240, 0.15);
+}
+
+.btn-outline-danger {
+    color: #dc3545;
+    border-color: #f5c2c7;
+    background-color: transparent;
+}
+
+.btn-outline-danger:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.15);
 }
 
 /* ========================================

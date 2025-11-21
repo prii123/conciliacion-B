@@ -12,10 +12,6 @@ def home(request: Request):
 def empresas(request: Request):
     return templates.TemplateResponse("empresas.html", {"request": request})
 
-@router.get("/lista_empresas", name="lista_empresas")
-def lista_empresas(request: Request):
-    return templates.TemplateResponse("lista_empresas.html", {"request": request})
-
 @router.get("/nueva_empresa", name="nueva_empresa")
 def nueva_empresa(request: Request):
     return templates.TemplateResponse("nueva_empresa.html", {"request": request})
