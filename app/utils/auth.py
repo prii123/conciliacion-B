@@ -14,14 +14,14 @@ from app.schemas import TokenData
 
 # Configuración de seguridad
 SECRET_KEY = "tu_clave_secreta_muy_segura_cambiala_en_produccion_12345"  # Cambiar en producción
-ALGORITHM = "HS256"
+ALGORITHM = "HS256" 
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Contexto de hash de contraseñas (configurado para bcrypt 4.0+)
+# Contexto de hash de contraseñas con configuración compatible
+# Usa bcrypt 4.0.1 que es compatible con passlib 1.7.4
 pwd_context = CryptContext(
     schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=12
+    deprecated="auto"
 )
 
 # OAuth2 scheme
