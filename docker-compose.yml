@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: conciliaciones-fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount application code for hot reload
+      - .:/app
+      # Mount generated reports directory
+      - ./generated_reports:/app/generated_reports
+      # Mount database file
+      - ./conciliaciones.db:/app/conciliaciones.db
+    environment:
+      - DATABASE_URL=sqlite:///./conciliaciones.db
+    restart: unless-stopped
+    networks:
+      - conciliaciones-network
+
+networks:
+  conciliaciones-network:
+    driver: bridge
