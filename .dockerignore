@@ -44,17 +44,38 @@ Thumbs.db
 .gitignore
 
 # Docker
-Dockerfile
 docker-compose.yml
+docker-compose.prod.yml
 .dockerignore
 
-# Database backup
+# Database
+*.db
+*.db-journal
+conciliaciones.db*
+
+# Backup files
 *.bak
+*.backup
+
+# Generated reports (se monta como volumen)
+generated_reports/
 
 # Test files
 tests/
 *.pytest_cache/
 
-# Documentation
+# Scripts de desarrollo
+*.bat
+diagnostico.bat
+run_app.bat
+start.bat
+
+# Archivos de entorno
+.env
+.env.*
+
+# Documentación
 README.md
-*.md
+DEPLOY.md
+AUTENTICACION.md
+deploy.sh

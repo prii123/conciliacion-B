@@ -1,4 +1,53 @@
+# Python
 .venv/
 venv/
 __pycache__/
-conciliciones.db
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Base de datos
+conciliaciones.db
+conciliaciones.db-journal
+*.db
+*.db-journal
+*.db.bak
+*.backup
+
+# Archivos de entorno
+.env
+.env.local
+.env.production
+
+# Reportes generados
+generated_reports/*
+!generated_reports/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Archivos temporales
+tmp/
+temp/
+*.tmp
+
+# Docker
+docker-compose.override.yml

@@ -1,9 +1,11 @@
 import pandas as pd
+import os
 from app.models import Conciliacion, Movimiento
 
 
 # Variable base para la URL del servidor
-BASE_URL = "http://localhost"
+# Si se ejecuta en Docker, usar variable de entorno, sino localhost
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 
 def format_currency(v):

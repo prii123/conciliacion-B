@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from app.api import routes_auth, routes_conciliacion, routes_empresas
 from pathlib import Path
+import os
 
 from app.api import routes_conciliacion, routes_empresas, routes_informes
 from app.web import router_conciliaciones, router_home
@@ -12,6 +14,20 @@ from .models import Empresa
 
 # create DB tables
 Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Conciliaciones Bancarias")
+
+# Configurar CORS para producción
+# Obtener el dominio desde variable de entorno o permitir localhost en desarrollo
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://localhost").split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,  # En producción, especificar dominios exactos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app = FastAPI(title="Conciliaciones Bancarias")
 
