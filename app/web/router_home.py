@@ -16,6 +16,10 @@ def guia(request: Request):
 def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+@router.get("/login", name="login")
+def login(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
 @router.get("/error", name="error")
 def error(request: Request):
     return templates.TemplateResponse("error.html", {"request": request})

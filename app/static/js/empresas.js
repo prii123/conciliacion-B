@@ -58,12 +58,8 @@ const EmpresasManager = {
             // Mostrar indicador de carga
             this.mostrarCargando(tbody);
 
-            const response = await fetch(`${BASE_URL}/api/empresas/`);
-            if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
-            }
-
-            const empresasData = await response.json();
+            // Usar Auth.get para cargar empresas con autenticación
+            const empresasData = await Auth.get(`${BASE_URL}/api/empresas/`);
 
             // Registrar la respuesta para depuración
             // console.log('Respuesta de la API:', empresasData);

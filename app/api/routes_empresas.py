@@ -3,20 +3,28 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import List, Dict, Any
+from app.utils.auth import get_current_active_user
 from ..database import get_db
-from ..models import Empresa, Conciliacion
+from ..models import Empresa, Conciliacion, User
 from ..schemas import ConciliacionSchema
 from .schemas.empresa_schemas import EmpresaCreate, EmpresaSchema
 
 router = APIRouter()
 
 @router.get("/", name="lista_empresas")
-def lista_empresas(db: Session = Depends(get_db)):
+def lista_empresas(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     empresas = db.query(Empresa).order_by(Empresa.id.desc()).all()
     return JSONResponse(content={"empresas": [EmpresaSchema.from_orm(e).dict() for e in empresas]})
 
 @router.post("/nueva", name="nueva_empresa_post")
-def nueva_empresa_post(empresa: EmpresaCreate, db: Session = Depends(get_db)):
+def nueva_empresa_post(
+    empresa: EmpresaCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     print(empresa)
     existing = db.query(Empresa).filter(Empresa.nit == empresa.nit).first()
     if existing:
@@ -33,7 +41,11 @@ def nueva_empresa_post(empresa: EmpresaCreate, db: Session = Depends(get_db)):
     return JSONResponse(content={"message": "Empresa creada exitosamente", "empresa": EmpresaSchema.from_orm(nueva_empresa).dict()})
 
 @router.get("/{empresa_id}/conciliaciones", name="conciliaciones_empresas")
-def conciliaciones_empresa(empresa_id: int, db: Session = Depends(get_db)):
+def conciliaciones_empresa(
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")

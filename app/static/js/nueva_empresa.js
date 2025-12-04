@@ -13,26 +13,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // console.log('Datos del formulario:', data);
 
         try {
-            const response = await fetch(`${BASE_URL}/api/empresas/nueva`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                // alert(`Error: ${error.detail}`);
-                console.log('Error al crear la empresa:', error);
-                return;
-            }
-
+            // Usar Auth.post para enviar con autenticación
+            const result = await Auth.post(`${BASE_URL}/api/empresas/nueva`, data);
+            
             // alert('Empresa creada exitosamente');
             window.location.href = '/empresas'; // Redirigir a la lista de empresas
         } catch (error) {
             console.error('Error al guardar la empresa:', error);
-            // alert('Ocurrió un error al guardar la empresa. Intente nuevamente.');
+            alert(`Error: ${error.message || 'Ocurrió un error al guardar la empresa. Intente nuevamente.'}`);
         }
     });
 });

@@ -2,11 +2,8 @@ import { BASE_URL } from "./config.js";
 
 async function fetchMatchesAndManuals(conciliacionId) {
     try {
-        const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/matches_y_manuales`);
-        if (!response.ok) {
-            throw new Error("Failed to fetch data");
-        }
-        const data = await response.json();
+        // Usar Auth.get para cargar con autenticación
+        const data = await Auth.get(`${BASE_URL}/api/conciliaciones/${conciliacionId}/matches_y_manuales`);
         // console.log("Fetched data:", data);
         renderStats(data.stats);
         renderMatchesAndManuals(data);

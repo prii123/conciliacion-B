@@ -7,8 +7,9 @@ import io, pandas as pd
 
 from app.utils.utils import validar_excel
 from app.utils.file_validation import validar_archivo_csv, validar_numeros_debito_credito, formatear_datos_para_movimientos, agrupar_movimientos_por_mes_y_guardar
+from app.utils.auth import get_current_active_user
 from ..database import get_db
-from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar
+from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar, User
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from ..utils.conciliaciones import realizar_conciliacion_automatica, crear_conciliacion_manual
@@ -19,7 +20,10 @@ router = APIRouter()
 
 
 @router.get("/")
-def lista_conciliaciones_json(db: Session = Depends(get_db)):
+def lista_conciliaciones_json(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     conciliaciones = db.query(Conciliacion).order_by(Conciliacion.id.desc()).all()
 
     conciliaciones_por_empresa = {}
@@ -60,7 +64,11 @@ def lista_conciliaciones_json(db: Session = Depends(get_db)):
     return JSONResponse(content=jsonable_encoder(conciliaciones_por_empresa))
 
 @router.get("/{conciliacion_id}")
-def detalle_conciliacion_json(conciliacion_id: int, db: Session = Depends(get_db)):
+def detalle_conciliacion_json(
+    conciliacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
@@ -125,7 +133,11 @@ def detalle_conciliacion_json(conciliacion_id: int, db: Session = Depends(get_db
     })
 
 @router.get("/conciliaciones_empresa/{empresa_id}", name="conciliaciones_empresa_json") 
-def conciliaciones_empresa_json(empresa_id: int, db: Session = Depends(get_db)):
+def conciliaciones_empresa_json(
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
@@ -138,7 +150,11 @@ def conciliaciones_empresa_json(empresa_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{conciliacion_id}/matches_y_manuales", name="matches_y_conciliaciones_manuales")
-def obtener_matches_y_conciliaciones_manuales(conciliacion_id: int, db: Session = Depends(get_db)):
+def obtener_matches_y_conciliaciones_manuales(
+    conciliacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
@@ -192,7 +208,8 @@ async def upload_files(
     cuenta: str = Form(...),
     anio: int = Form(...),
     id_empresa: int = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ): 
     try:
         banco_content = await file_banco.read()
@@ -257,7 +274,8 @@ async def carga_archivo_individual(
     conciliacion_id: int,
     archivo: UploadFile = File(...),
     tipo_movimiento: str = Form(...),  # "banco" o "auxiliar" 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Carga un archivo individual a una conciliación existente.
@@ -311,7 +329,8 @@ async def upload_individual(
     archivo: UploadFile = File(...),
     empresa_id: int = Form(...),
     cuenta_conciliada: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     try:
         # Leer el contenido del archivo
@@ -381,7 +400,8 @@ async def agregar_movimientos_a_conciliacion(
     conciliacion_id: int,
     archivo: UploadFile = File(...),
     tipo_movimiento: str = Form(...),  # "banco" o "auxiliar"
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Agrega movimientos de un archivo Excel a una conciliación existente.
@@ -447,7 +467,11 @@ async def agregar_movimientos_a_conciliacion(
 
 
 @router.post("/{conciliacion_id}/procesar")
-def procesar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
+def procesar_conciliacion(
+    conciliacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Procesa automáticamente una conciliación utilizando los métodos de conciliación en utils/conciliaciones.py.
     """
@@ -455,7 +479,11 @@ def procesar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
     return {"message": f"Conciliación #{conciliacion_id} procesada automáticamente."}
 
 @router.post("/{conciliacion_id}/terminar_conciliacion")
-def terminar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
+def terminar_conciliacion(
+    conciliacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
     if not conciliacion:
         raise HTTPException(404, "Conciliación no encontrada")
@@ -468,7 +496,12 @@ class ConciliacionManualRequest(BaseModel):
     id_auxiliar: List[int]
 
 @router.post("/{conciliacion_id}/conciliar-manual")
-def conciliar_manual(conciliacion_id: int, request: ConciliacionManualRequest, db: Session = Depends(get_db)):
+def conciliar_manual(
+    conciliacion_id: int,
+    request: ConciliacionManualRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Realiza una conciliación manual utilizando el método en utils/conciliaciones.py.
     """
@@ -477,7 +510,11 @@ def conciliar_manual(conciliacion_id: int, request: ConciliacionManualRequest, d
 
 
 @router.delete("/match/{match_id}/eliminar")
-def eliminar_match_manual(match_id: int, db: Session = Depends(get_db)):
+def eliminar_match_manual(
+    match_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     match = db.query(ConciliacionMatch).filter(ConciliacionMatch.id == match_id).first()
     if not match:
         raise HTTPException(404, "Match no encontrado")
@@ -487,7 +524,11 @@ def eliminar_match_manual(match_id: int, db: Session = Depends(get_db)):
     return {"message": f"Match #{match_id} eliminado con éxito."}
 
 @router.delete("/{conciliacion_id}/eliminar")
-def eliminar_conciliacion(conciliacion_id: int, db: Session = Depends(get_db)):
+def eliminar_conciliacion(
+    conciliacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Elimina una conciliación completa junto con todos sus movimientos y matches asociados.
     """

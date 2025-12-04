@@ -13,9 +13,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selectEmpresa = document.getElementById("id_empresa");
 
     try {
-        const response = await fetch(`${BASE_URL}/api/empresas`);
-        if (!response.ok) throw new Error("Error al cargar empresas");
-        const data = await response.json();
+        // Usar Auth.get en lugar de fetch directo
+        const data = await Auth.get(`${BASE_URL}/api/empresas/`);
 
         // console.log(data); // Verificar la estructura de la respuesta
 
@@ -50,25 +49,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             const formData = new FormData(uploadForm);
 
             try {
-                const response = await fetch(`${BASE_URL}/api/conciliaciones/upload`, {
-                    method: "POST",
-                    body: formData,
-                });
+                // Usar Auth.post para enviar con autenticación
+                const result = await Auth.post(`${BASE_URL}/api/conciliaciones/upload`, formData);
 
-                const result = await response.json();
-
-                if (!response.ok) {
-                    // Mostrar errores si los hay
-                    console.error("Errores al cargar archivos:", result);
-                    alert(`Error: ${result.error || "Error desconocido"}`);
-                } else {
-                    // Mostrar mensaje de éxito
-                    console.log("Archivos cargados exitosamente:", result);
-                    window.location.reload();
-                }
+                // Mostrar mensaje de éxito
+                console.log("Archivos cargados exitosamente:", result);
+                window.location.reload();
             } catch (error) {
                 console.error("Error al enviar los archivos:", error);
-                alert("Error al enviar los archivos. Intente nuevamente más tarde.");
+                alert(`Error: ${error.message || "Error al enviar los archivos. Intente nuevamente más tarde."}`);
             }
         });
     }
@@ -78,9 +67,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selectConciliacionIndividual = document.getElementById("conciliacion_individual");
 
     try {
-        const responseEmpresas = await fetch(`${BASE_URL}/api/empresas`);
-        if (!responseEmpresas.ok) throw new Error("Error al cargar empresas");
-        const empresasData = await responseEmpresas.json();
+        // Usar Auth.get para cargar empresas con autenticación
+        const empresasData = await Auth.get(`${BASE_URL}/api/empresas/`);
 
         const empresas = Array.isArray(empresasData) ? empresasData : empresasData.empresas || [];
         empresas.forEach(emp => {
@@ -153,24 +141,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             formData.append("archivo", archivoInput.files[0]);
 
             try {
-                const response = await fetch(`${BASE_URL}/api/conciliaciones/upload_individual`, {
-                    method: "POST",
-                    body: formData,
-                });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    console.error("Errores al cargar archivo individual:", result);
-                    alert(`Error: ${result.detail || result.message || "Error desconocido"}`);
-                } else {
-                    console.log("Archivo individual cargado exitosamente:", result);
-                    alert("Archivo cargado exitosamente.");
-                    window.location.reload();
-                }
+                // Usar Auth.post para enviar con autenticación
+                const result = await Auth.post(`${BASE_URL}/api/conciliaciones/upload_individual`, formData);
+                
+                console.log("Archivo individual cargado exitosamente:", result);
+                alert("Archivo cargado exitosamente.");
+                window.location.reload();
             } catch (error) {
                 console.error("Error al subir archivo individual:", error);
-                alert("Error al subir archivo. Intente nuevamente más tarde.");
+                alert(`Error: ${error.message || "Error desconocido"}`);
             }
         });
     }

@@ -1,7 +1,21 @@
-from sqlalchemy import Column, Integer, String, Date, Float, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Date, Float, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 from .database import Base
 from datetime import date, datetime
+
+
+class User(Base):
+    """
+    Modelo para almacenar usuarios del sistema
+    """
+    __tablename__ = 'users'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(String)
 
 
 class Empresa(Base):

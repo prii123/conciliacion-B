@@ -36,13 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadConciliacionDetails = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}`);
+            // Usar Auth.get para cargar con autenticación
+            const data = await Auth.get(`${BASE_URL}/api/conciliaciones/${conciliacionId}`);
 
-            if (!response.ok) {
-                throw new Error("Error al cargar los detalles de la conciliación");
-            }
-
-            const data = await response.json();
             // console.log("Detalles de la conciliación cargados:", data);
             // console.log("Movimientos no conciliados (banco):", data.movimientos_no_conciliados.banco);
             // console.log("Movimientos no conciliados (auxiliar):", data.movimientos_no_conciliados.auxiliar);
@@ -286,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnConfirmarConciliacion = document.getElementById('btnConfirmarConciliacion');
 
     if (btnConfirmarConciliacion) {
-        btnConfirmarConciliacion.addEventListener('click', () => {
+        btnConfirmarConciliacion.addEventListener('click', async () => {
             // console.log('Botón Confirmar Conciliación clickeado');
 
             // Verificar que hay datos seleccionados
@@ -303,26 +299,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // console.log('Payload a enviar:', payload);
 
-            // Enviar los datos al backend
-            fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/conciliar-manual`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-                .then(async res => {
-                    const data = await res.json().catch(() => ({}));
-                    // console.log('Respuesta del servidor:', data);
-                    if (res.ok && data.message) {
-                        // alert(data.message);
-                        window.location.reload();
-                    } else {
-                        alert(data.error || 'Error al realizar la conciliación manual.');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error de red:', err);
-                    alert('Error de red al intentar realizar la conciliación manual.');
-                });
+            try {
+                // Usar Auth.post para conciliación manual con autenticación
+                const data = await Auth.post(`${BASE_URL}/api/conciliaciones/${conciliacionId}/conciliar-manual`, payload);
+                
+                if (data.message) {
+                    // alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Error al realizar la conciliación manual.');
+                }
+            } catch (error) {
+                console.error('Error al realizar la conciliación manual:', error);
+                alert(`Error: ${error.message || 'Error al intentar realizar la conciliación manual.'}`);
+            }
         });
     } else {
         console.error('El botón con ID "btnConfirmarConciliacion" no se encontró en el DOM.');
@@ -347,20 +337,14 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
 
         try {
-            const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/procesar`, {
-                method: "POST",
-            });
-
-            if (!response.ok) {
-                throw new Error("Error al procesar la conciliación automáticamente.");
-            }
-
-            const data = await response.json();
+            // Usar Auth.post para procesar con autenticación
+            const data = await Auth.post(`${BASE_URL}/api/conciliaciones/${conciliacionId}/procesar`, {});
+            
             // alert(data.message || "Conciliación procesada automáticamente con éxito.");
             window.location.reload();
         } catch (error) {
             console.error("Error al procesar la conciliación:", error);
-            // alert("Ocurrió un error al intentar procesar la conciliación automáticamente.");
+            alert(`Error: ${error.message || "Ocurrió un error al intentar procesar la conciliación automáticamente."}`);
         }
     });
 
@@ -371,20 +355,13 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault();
 
             try {
-                const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/terminar_conciliacion`, {
-                    method: 'POST',
-                });
-
-                if (!response.ok) {
-                    throw new Error('Error al terminar la conciliación.');
-                }
-
-                const data = await response.json();
+                // Usar Auth.post para terminar conciliación con autenticación
+                const data = await Auth.post(`${BASE_URL}/api/conciliaciones/${conciliacionId}/terminar_conciliacion`, {});
                 // alert(data.message || 'Conciliación terminada con éxito.');
                 window.location.reload();
             } catch (error) {
                 console.error('Error al intentar terminar la conciliación:', error);
-                alert('Ocurrió un error al intentar terminar la conciliación.');
+                alert(`Error: ${error.message || 'Ocurrió un error al intentar terminar la conciliación.'}`);
             }
         });
     } else {
@@ -429,20 +406,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/eliminar`, {
-                    method: 'DELETE',
-                });
-
-                if (response.ok) {
-                    // alert('Conciliación eliminada exitosamente');
-                    window.location.href = '/conciliaciones';
-                } else {
-                    const errorData = await response.json();
-                    // alert(`Error al eliminar la conciliación: ${errorData.detail}`);
-                }
+                // Usar Auth.delete para eliminar con autenticación
+                await Auth.delete(`${BASE_URL}/api/conciliaciones/${conciliacionId}/eliminar`);
+                // alert('Conciliación eliminada exitosamente');
+                window.location.href = '/conciliaciones';
             } catch (error) {
                 console.error('Error al eliminar la conciliación:', error);
-                alert('Error al eliminar la conciliación. Por favor, inténtelo de nuevo.');
+                alert(`Error: ${error.message || 'Error al eliminar la conciliación. Por favor, inténtelo de nuevo.'}`);
             }
         });
     }

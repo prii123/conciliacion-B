@@ -92,23 +92,18 @@ class AgregarMovimientos {
         submitBtn.disabled = true;
 
         try {
-            const response = await fetch(`${BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
+            // Usar Auth.post para enviar con autenticación
+            const result = await Auth.post(
+                `${BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`,
+                formData
+            );
             
-            if (response.ok) {
-                this.showSuccessResult(result);
-                this.resetForm();
-            } else {
-                this.showAlert('danger', `Error: ${result.detail || result.message || 'Error desconocido'}`);
-            }
+            this.showSuccessResult(result);
+            this.resetForm();
 
         } catch (error) {
             console.error('Error en la petición:', error);
-            this.showAlert('danger', 'Error de conexión. Por favor, verifique su conexión a internet.');
+            this.showAlert('danger', `Error: ${error.message || 'Error de conexión. Por favor, verifique su conexión a internet.'}`);
         } finally {
             // Restaurar botón
             submitBtn.innerHTML = originalText;

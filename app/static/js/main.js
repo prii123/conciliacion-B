@@ -152,10 +152,15 @@ const FileHandler = {
 
 const API = {
     /**
-     * Realiza una petición POST
+     * Realiza una petición POST con autenticación
      */
     async post(url, data) {
         try {
+            // Usar Auth si está disponible, sino fetch normal
+            if (window.Auth) {
+                return await window.Auth.post(url, data);
+            }
+            
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -178,10 +183,15 @@ const API = {
     },
 
     /**
-     * Realiza una petición DELETE
+     * Realiza una petición DELETE con autenticación
      */
     async delete(url) {
         try {
+            // Usar Auth si está disponible, sino fetch normal
+            if (window.Auth) {
+                return await window.Auth.delete(url);
+            }
+            
             const response = await fetch(url, {
                 method: 'DELETE',
                 headers: {
@@ -203,10 +213,15 @@ const API = {
     },
 
     /**
-     * Realiza una petición GET
+     * Realiza una petición GET con autenticación
      */
     async get(url) {
         try {
+            // Usar Auth si está disponible, sino fetch normal
+            if (window.Auth) {
+                return await window.Auth.get(url);
+            }
+            
             const response = await fetch(url);
             
             const result = await response.json();

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from app.api import routes_conciliacion, routes_empresas
+from app.api import routes_auth, routes_conciliacion, routes_empresas
 from pathlib import Path
 
 from app.api import routes_conciliacion, routes_empresas, routes_informes
@@ -19,7 +19,8 @@ app = FastAPI(title="Conciliaciones Bancarias")
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# Include routers
+# Include API routers
+app.include_router(routes_auth.router, prefix="/api/auth", tags=["autenticacion"])
 app.include_router(routes_conciliacion.router, prefix="/api/conciliaciones", tags=["conciliaciones"])
 app.include_router(routes_empresas.router, prefix="/api/empresas", tags=["empresas"])
 app.include_router(routes_informes.router, prefix="/api/informes", tags=["Informes"])

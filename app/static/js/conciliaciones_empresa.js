@@ -9,13 +9,8 @@ async function fetchConciliaciones(empresaId) {
         const url = `${BASE_URL}/api/empresas/${empresaId}/conciliaciones`;
         // console.log("Fetching data from:", url);
 
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`Error en la solicitud: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        // Usar Auth.get para obtener conciliaciones con autenticación
+        const data = await Auth.get(url);
         // console.log("Fetched data:", data);
 
         if (!data || !data.empresa || !data.conciliaciones) {
@@ -74,8 +69,19 @@ function generateTable(conciliaciones) {
 
 window.generarInforme = async function (conciliacionId) {
     try {
-        const response = await fetch(`${BASE_URL}/api/informes/${conciliacionId}`);
+        // Usar Auth para petición con token pero manejando blob
+        const token = Auth.getToken();
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch(`${BASE_URL}/api/informes/${conciliacionId}`, {
+            headers
+        });
+        
         if (!response.ok) {
+            if (response.status === 401) {
+                Auth.handleUnauthorized(response);
+                return;
+            }
             throw new Error("Error al generar el informe");
         }
         const blob = await response.blob();

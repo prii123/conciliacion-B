@@ -7,10 +7,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const container = document.querySelector("#conciliaciones-container");
 
     try {
-        const response = await fetch(`${BASE_URL}/api/conciliaciones/`);
-        if (!response.ok) throw new Error("Error al cargar las conciliaciones");
-
-        const data = await response.json();
+        // Usar Auth.get en lugar de fetch directo
+        const data = await Auth.get(`${BASE_URL}/api/conciliaciones/`);
+        
         // Almacenar los datos originales
         originalData = data;
         // console.log("Conciliaciones cargadas:", data);
@@ -154,10 +153,23 @@ function renderConciliaciones(conciliaciones, empresaId) {
 // Expose the function to the global scope
 window.generarInforme = async function (conciliacionId) {
     try {
-        const response = await fetch(`${BASE_URL}/api/informes/${conciliacionId}`);
+        // Hacer petición autenticada pero manejando blob manualmente
+        const token = Auth.getToken();
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch(`${BASE_URL}/api/informes/${conciliacionId}`, {
+            headers
+        });
+        
         if (!response.ok) {
+            // Manejar 401
+            if (response.status === 401) {
+                Auth.handleUnauthorized(response);
+                return;
+            }
             throw new Error("Error al generar el informe");
         }
+        
         const blob = await response.blob();
         console.log("Informe generado:", blob);
         const url = window.URL.createObjectURL(blob);
