@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserResponse, Token, UserLogin
+from app.repositories.factory import RepositoryFactory
 from app.utils.auth import (
     get_password_hash,
     authenticate_user,
@@ -39,18 +40,19 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail="El email ya está registrado"
         )
     
-    # Crear nuevo usuario
-    db_user = User(
-        username=user.username,
-        email=user.email,
-        hashed_password=get_password_hash(user.password),
-        is_active=True,
-        created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    # Crear nuevo usuario usando el repositorio
+    factory = RepositoryFactory(db)
+    user_repo = factory.get_user_repository()
     
+    user_data = {
+        "username": user.username,
+        "email": user.email,
+        "hashed_password": get_password_hash(user.password),
+        "is_active": True,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    db_user = user_repo.create(user_data)
     return db_user
 
 

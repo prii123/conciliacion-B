@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Conciliacion
+from app.repositories.factory import RepositoryFactory
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter()
@@ -19,7 +20,10 @@ def conciliaciones_empresa(request: Request, conciliacion_id: int):
 
 @router.get("/detalle/{conciliacion_id}", name="detalle_conciliacion")
 def detalle_conciliacion(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
-    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    factory = RepositoryFactory(db)
+    conciliacion_repo = factory.get_conciliacion_repository()
+    
+    conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
 
@@ -42,7 +46,10 @@ def matches_conciliacion(request: Request, conciliacion_id: int):
 
 @router.get("/agregar_movimientos/{conciliacion_id}", name="agregar_movimientos")
 def agregar_movimientos(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
-    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    factory = RepositoryFactory(db)
+    conciliacion_repo = factory.get_conciliacion_repository()
+    
+    conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
 

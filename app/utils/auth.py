@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import TokenData
+from app.repositories.factory import RepositoryFactory
 
 # Configuración de seguridad
 SECRET_KEY = "tu_clave_secreta_muy_segura_cambiala_en_produccion_12345"  # Cambiar en producción
@@ -52,12 +53,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def get_user_by_username(db: Session, username: str) -> Optional[User]:
     """Obtiene un usuario por su nombre de usuario"""
-    return db.query(User).filter(User.username == username).first()
+    factory = RepositoryFactory(db)
+    user_repo = factory.get_user_repository()
+    return user_repo.get_by_username(username)
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Obtiene un usuario por su email"""
-    return db.query(User).filter(User.email == email).first()
+    factory = RepositoryFactory(db)
+    user_repo = factory.get_user_repository()
+    return user_repo.get_by_email(email)
 
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:

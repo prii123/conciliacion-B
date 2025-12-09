@@ -13,6 +13,7 @@ from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, Conci
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from ..utils.conciliaciones import realizar_conciliacion_automatica, crear_conciliacion_manual
+from ..repositories.factory import RepositoryFactory
 
 router = APIRouter()
 
@@ -24,18 +25,19 @@ def lista_conciliaciones_json(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    conciliaciones = db.query(Conciliacion).order_by(Conciliacion.id.desc()).all()
+    factory = RepositoryFactory(db)
+    conciliacion_repo = factory.get_conciliacion_repository()
+    movimiento_repo = factory.get_movimiento_repository()
+    
+    conciliaciones = conciliacion_repo.get_all(order_by='id', desc_order=True)
 
     conciliaciones_por_empresa = {}
     for c in conciliaciones:
         empresa = c.empresa.razon_social if c.empresa and c.empresa.razon_social else (c.empresa.nombre_comercial if c.empresa else 'Desconocida')
 
-        # Obtener estadísticas directamente desde la tabla Movimiento
-        total = db.query(Movimiento).filter(Movimiento.id_conciliacion == c.id).count()
-        conciliados = db.query(Movimiento).filter(
-            Movimiento.id_conciliacion == c.id,
-            Movimiento.estado_conciliacion == "conciliado"
-        ).count()
+        # Obtener estadísticas usando el repositorio
+        total = movimiento_repo.count_by_conciliacion(c.id)
+        conciliados = movimiento_repo.count_by_conciliacion(c.id, {'estado_conciliacion': 'conciliado'})
         pendientes = total - conciliados
 
         # Calcular el porcentaje de conciliación
@@ -69,16 +71,24 @@ def detalle_conciliacion_json(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+    factory = RepositoryFactory(db)
+    conciliacion_repo = factory.get_conciliacion_repository()
+    movimiento_repo = factory.get_movimiento_repository()
+    match_repo = factory.get_match_repository()
+    manual_repo = factory.get_manual_repository()
+    
+    conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
 
-    movimientos = db.query(Movimiento).filter(Movimiento.id_conciliacion == conciliacion_id).all()
+    movimientos = movimiento_repo.get_by_conciliacion(conciliacion_id)
     movimientos_no_conciliados = {
         "banco": jsonable_encoder([m for m in movimientos if m.tipo == "banco" and m.estado_conciliacion == "no_conciliado"]),
         "auxiliar": jsonable_encoder([m for m in movimientos if m.tipo == "auxiliar" and m.estado_conciliacion == "no_conciliado"]),
     }
 
+    # Obtener matches automáticos usando repositorio
+    matches_automaticos = match_repo.get_by_conciliacion(conciliacion_id)
     movimientos_conciliados_automaticos = [
         {
             "id": match.id,
@@ -88,31 +98,33 @@ def detalle_conciliacion_json(
             "criterio_match": match.criterio_match,
             "diferencia_valor": match.diferencia_valor
         }
-        for match in db.query(ConciliacionMatch).filter(ConciliacionMatch.id_conciliacion == conciliacion_id).all()
+        for match in matches_automaticos
     ]
 
-    movimientos_conciliados_manuales = [
-        {
-            "id": cm.id,
-            "id_movimiento_banco": banco.id,
-            "id_movimiento_auxiliar": auxiliar.id,
-            "fecha_match": cm.fecha_creacion,
-            "criterio_match": "manual",
-            "diferencia_valor": abs(banco.valor - auxiliar.valor)
-        }
-        for cm in db.query(ConciliacionManual).filter(ConciliacionManual.id_conciliacion == conciliacion_id).all()
-        for banco in db.query(Movimiento).join(ConciliacionManualBanco).filter(ConciliacionManualBanco.id_conciliacion_manual == cm.id).all()
-        for auxiliar in db.query(Movimiento).join(ConciliacionManualAuxiliar).filter(ConciliacionManualAuxiliar.id_conciliacion_manual == cm.id).all()
-    ]
+    # Obtener conciliaciones manuales usando repositorio
+    manuales = manual_repo.get_by_conciliacion(conciliacion_id)
+    movimientos_conciliados_manuales = []
+    for cm in manuales:
+        bancos = manual_repo.get_banco_items(cm.id)
+        auxiliares = manual_repo.get_auxiliar_items(cm.id)
+        for banco_item in bancos:
+            banco = movimiento_repo.get_by_id(banco_item.id_movimiento_banco)
+            for aux_item in auxiliares:
+                auxiliar = movimiento_repo.get_by_id(aux_item.id_movimiento_auxiliar)
+                movimientos_conciliados_manuales.append({
+                    "id": cm.id,
+                    "id_movimiento_banco": banco.id if banco else None,
+                    "id_movimiento_auxiliar": auxiliar.id if auxiliar else None,
+                    "fecha_match": cm.fecha_creacion,
+                    "criterio_match": "manual",
+                    "diferencia_valor": abs(banco.valor - auxiliar.valor) if banco and auxiliar else 0
+                })
 
     movimientos_conciliados = movimientos_conciliados_automaticos + movimientos_conciliados_manuales
 
-    # Calcular estadísticas directamente desde la tabla Movimiento (igual que en la lista)
-    total = db.query(Movimiento).filter(Movimiento.id_conciliacion == conciliacion_id).count()
-    conciliados = db.query(Movimiento).filter(
-        Movimiento.id_conciliacion == conciliacion_id,
-        Movimiento.estado_conciliacion == "conciliado"
-    ).count()
+    # Calcular estadísticas usando el repositorio
+    total = movimiento_repo.count_by_conciliacion(conciliacion_id)
+    conciliados = movimiento_repo.count_by_conciliacion(conciliacion_id, {'estado_conciliacion': 'conciliado'})
     pendientes = total - conciliados
 
     # Calcular el porcentaje de conciliación
@@ -138,11 +150,15 @@ def conciliaciones_empresa_json(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    factory = RepositoryFactory(db)
+    empresa_repo = factory.get_empresa_repository()
+    conciliacion_repo = factory.get_conciliacion_repository()
+    
+    empresa = empresa_repo.get_by_id(empresa_id)
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
 
-    conciliaciones = db.query(Conciliacion).filter(Conciliacion.id_empresa == empresa_id).all()
+    conciliaciones = conciliacion_repo.get_by_empresa(empresa_id)
     en_proceso = [c.to_dict() for c in conciliaciones if c.estado == 'en_proceso']
     finalizadas = [c.to_dict() for c in conciliaciones if c.estado == 'finalizada']
 
@@ -224,46 +240,48 @@ async def upload_files(
         df_auxiliar.dropna(subset=['fecha'], inplace=True)
         validar_excel(df_auxiliar, nombre_archivo=file_auxiliar.filename, tipo_archivo="AUXILIAR")
 
-        nueva_conciliacion = Conciliacion(
-            id_empresa=id_empresa,
-            fecha_proceso=datetime.now().strftime("%Y-%m-%d"),
-            nombre_archivo_banco=file_banco.filename,
-            nombre_archivo_auxiliar=file_auxiliar.filename,
-            mes_conciliado=mes,
-            cuenta_conciliada=cuenta,
-            año_conciliado=anio
-        )
-        db.add(nueva_conciliacion)
-        db.commit()
+        factory = RepositoryFactory(db)
+        conciliacion_repo = factory.get_conciliacion_repository()
+        movimiento_repo = factory.get_movimiento_repository()
+        
+        conciliacion_data = {
+            "id_empresa": id_empresa,
+            "fecha_proceso": datetime.now().strftime("%Y-%m-%d"),
+            "nombre_archivo_banco": file_banco.filename,
+            "nombre_archivo_auxiliar": file_auxiliar.filename,
+            "mes_conciliado": mes,
+            "cuenta_conciliada": cuenta,
+            "año_conciliado": anio
+        }
+        nueva_conciliacion = conciliacion_repo.create(conciliacion_data)
         conciliacion_id = nueva_conciliacion.id
 
-        movimientos_banco = [
-            Movimiento(
-                id_conciliacion=conciliacion_id,
-                fecha=str(row['fecha']),
-                descripcion=row['descripcion'],
-                valor=abs(row['valor']),
-                es=row['es'],
-                tipo='banco'
-            )
+        movimientos_banco_data = [
+            {
+                "id_conciliacion": conciliacion_id,
+                "fecha": str(row['fecha']),
+                "descripcion": row['descripcion'],
+                "valor": abs(row['valor']),
+                "es": row['es'],
+                "tipo": 'banco'
+            }
             for _, row in df_banco.iterrows()
         ]
 
-        movimientos_auxiliar = [
-            Movimiento(
-                id_conciliacion=conciliacion_id,
-                fecha=str(row['fecha']),
-                descripcion=row['descripcion'],
-                valor=abs(row['valor']),
-                es=row['es'],
-                tipo='auxiliar'
-            )
+        movimientos_auxiliar_data = [
+            {
+                "id_conciliacion": conciliacion_id,
+                "fecha": str(row['fecha']),
+                "descripcion": row['descripcion'],
+                "valor": abs(row['valor']),
+                "es": row['es'],
+                "tipo": 'auxiliar'
+            }
             for _, row in df_auxiliar.iterrows()
         ]
 
-        db.bulk_save_objects(movimientos_banco)
-        db.bulk_save_objects(movimientos_auxiliar)
-        db.commit()
+        movimiento_repo.create_bulk(movimientos_banco_data)
+        movimiento_repo.create_bulk(movimientos_auxiliar_data)
 
         return JSONResponse(content={"message": f"Archivos cargados exitosamente para la conciliación #{conciliacion_id}"})
     except Exception as e:

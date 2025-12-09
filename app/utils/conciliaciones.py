@@ -6,6 +6,7 @@ from sqlalchemy import and_
 from sqlalchemy.sql import text  # Importar text para consultas SQL sin procesar
 from difflib import SequenceMatcher
 from ..models import Conciliacion, ConciliacionMatch, Movimiento, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar
+from ..repositories.factory import RepositoryFactory
 
 
 
@@ -13,14 +14,16 @@ def obtener_movimientos_por_tipo(conciliacion_id, db, fuente, tipo_es):
     """
     Obtiene movimientos filtrados por fuente (banco/auxiliar) y tipo (E/S)
     """
-    return db.query(Movimiento).filter(
-        and_(
-            Movimiento.id_conciliacion == conciliacion_id,
-            Movimiento.tipo == fuente,
-            Movimiento.es == tipo_es,
-            Movimiento.estado_conciliacion == 'no_conciliado'
-        )
-    ).all()
+    factory = RepositoryFactory(db)
+    movimiento_repo = factory.get_movimiento_repository()
+    
+    filters = {
+        'tipo': fuente,
+        'es': tipo_es,
+        'estado_conciliacion': 'no_conciliado'
+    }
+    
+    return movimiento_repo.get_by_conciliacion(conciliacion_id, filters)
 
 def categorizar_por_valor(valor):
     if valor < 100000: return 'pequeño'
@@ -243,25 +246,29 @@ def encontrar_matches_valor_fecha_aproximada(df_banco: pd.DataFrame, df_auxiliar
     #matches_exactos[['id_banco', 'id_auxiliar', 'valor_rounded_banco', 'es_banco']]
     return matches_finales[['id_banco', 'id_auxiliar', 'valor_rounded', 'es_banco']]
 
-def crear_match_db(conciliacion_id, mov_banco, mov_auxiliar, criterio, diferencia, db):
+
+def crear_match_y_actualizar_movimientos(mov_banco, mov_auxiliar, conciliacion_id, db, criterio, diferencia=0.0):
     """
-    Crea un registro de match y actualiza el estado de los movimientos
+    Crea un match entre dos movimientos y actualiza su estado
     """
-    # Crear el registro de match
-    match = ConciliacionMatch(
-        id_conciliacion=conciliacion_id,
-        id_movimiento_banco=mov_banco.id,
-        id_movimiento_auxiliar=mov_auxiliar.id,
-        fecha_match=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        criterio_match=criterio,
-        diferencia_valor=diferencia
-    )
+    factory = RepositoryFactory(db)
+    match_repo = factory.get_match_repository()
+    movimiento_repo = factory.get_movimiento_repository()
     
-    db.add(match)
+    match_data = {
+        "id_conciliacion": conciliacion_id,
+        "id_movimiento_banco": mov_banco.id,
+        "id_movimiento_auxiliar": mov_auxiliar.id,
+        "fecha_match": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "criterio_match": criterio,
+        "diferencia_valor": diferencia
+    }
+    
+    match = match_repo.create(match_data)
     
     # Actualizar estado de los movimientos
-    mov_banco.estado_conciliacion = 'conciliado'
-    mov_auxiliar.estado_conciliacion = 'conciliado'
+    movimiento_repo.update(mov_banco.id, {"estado_conciliacion": "conciliado"})
+    movimiento_repo.update(mov_auxiliar.id, {"estado_conciliacion": "conciliado"})
     
     return match
 
@@ -269,19 +276,21 @@ def verificar_conciliacion_completa(conciliacion_id, db):
     """
     Verifica si la conciliación está completa y actualiza el estado
     """
-    movimientos_pendientes = db.query(Movimiento).filter(
-        and_(
-            Movimiento.id_conciliacion == conciliacion_id,
-            Movimiento.estado_conciliacion == 'no_conciliado'
-        )
-    ).count()
+    factory = RepositoryFactory(db)
+    movimiento_repo = factory.get_movimiento_repository()
+    conciliacion_repo = factory.get_conciliacion_repository()
+    
+    movimientos_pendientes = movimiento_repo.count_by_conciliacion(
+        conciliacion_id,
+        {'estado_conciliacion': 'no_conciliado'}
+    )
     
     print(f"Movimientos pendientes: {movimientos_pendientes}")
     
     if movimientos_pendientes == 0:
-        conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+        conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
         if conciliacion:
-            conciliacion.estado = 'finalizada'
+            conciliacion_repo.update(conciliacion_id, {"estado": "finalizada"})
             print("✅ Conciliación marcada como finalizada")
 
 
@@ -295,12 +304,15 @@ def procesar_matches(matches_df, criterio, conciliacion_id, db):
         conciliacion_id: ID de la conciliación
         db: Sesión de base de datos
     """
+    factory = RepositoryFactory(db)
+    movimiento_repo = factory.get_movimiento_repository()
+    
     matches_creados = []
     
     for _, match_row in matches_df.iterrows():
         # Obtener los movimientos originales
-        mov_banco = db.query(Movimiento).filter(Movimiento.id == match_row['id_banco']).first()
-        mov_auxiliar = db.query(Movimiento).filter(Movimiento.id == match_row['id_auxiliar']).first()
+        mov_banco = movimiento_repo.get_by_id(match_row['id_banco'])
+        mov_auxiliar = movimiento_repo.get_by_id(match_row['id_auxiliar'])
         
         if mov_banco and mov_auxiliar:
             # Determinar la diferencia según el tipo de match
@@ -311,14 +323,14 @@ def procesar_matches(matches_df, criterio, conciliacion_id, db):
             else:
                 diferencia = 0.0
             
-            # Crear el match usando la función corregida
-            match_obj = crear_match_db(
-                conciliacion_id, 
+            # Crear el match usando la función de repositorio
+            match_obj = crear_match_y_actualizar_movimientos(
                 mov_banco, 
                 mov_auxiliar, 
+                conciliacion_id, 
+                db, 
                 criterio, 
-                diferencia, 
-                db
+                diferencia
             )
             
             matches_creados.append(match_obj)
@@ -451,40 +463,44 @@ def crear_conciliacion_manual(conciliacion_id, id_banco, id_auxiliar, db):
         bancos_ids = [int(i) for i in id_banco] if isinstance(id_banco, (list, tuple)) else [int(id_banco)]
         aux_ids = [int(i) for i in id_auxiliar] if isinstance(id_auxiliar, (list, tuple)) else [int(id_auxiliar)]
 
-        # Validar movimientos
-        movimientos_banco = db.query(Movimiento).filter(
-            and_(
-                Movimiento.id.in_(bancos_ids),
-                Movimiento.id_conciliacion == conciliacion_id,
-                Movimiento.tipo == 'banco'
-            )
-        ).all()
+        factory = RepositoryFactory(db)
+        movimiento_repo = factory.get_movimiento_repository()
+        manual_repo = factory.get_manual_repository()
 
-        movimientos_auxiliar = db.query(Movimiento).filter(
-            and_(
-                Movimiento.id.in_(aux_ids),
-                Movimiento.id_conciliacion == conciliacion_id,
-                Movimiento.tipo == 'auxiliar'
-            )
-        ).all()
+        # Validar movimientos usando repositorio
+        movimientos_banco = []
+        for banco_id in bancos_ids:
+            mov = movimiento_repo.get_by_id(banco_id)
+            if mov and mov.id_conciliacion == conciliacion_id and mov.tipo == 'banco':
+                movimientos_banco.append(mov)
+
+        movimientos_auxiliar = []
+        for aux_id in aux_ids:
+            mov = movimiento_repo.get_by_id(aux_id)
+            if mov and mov.id_conciliacion == conciliacion_id and mov.tipo == 'auxiliar':
+                movimientos_auxiliar.append(mov)
 
         print(f"Movimientos banco encontrados: {[m.id for m in movimientos_banco]}")
         print(f"Movimientos auxiliar encontrados: {[m.id for m in movimientos_auxiliar]}\n")
 
         # Crear registro en ConciliacionManual
-        conciliacion_manual = ConciliacionManual(id_conciliacion=conciliacion_id)
-        db.add(conciliacion_manual)
-        db.flush()  # Obtener ID de la conciliación manual
+        conciliacion_manual_data = {"id_conciliacion": conciliacion_id}
+        conciliacion_manual = manual_repo.create(conciliacion_manual_data)
 
         # Asociar movimientos a la conciliación manual
         for mov in movimientos_banco:
-            db.add(ConciliacionManualBanco(id_conciliacion_manual=conciliacion_manual.id, id_movimiento_banco=mov.id))
-            mov.estado_conciliacion = 'conciliado'  # Actualizar estado del movimiento
+            manual_repo.create_banco_item({
+                "id_conciliacion_manual": conciliacion_manual.id,
+                "id_movimiento_banco": mov.id
+            })
+            movimiento_repo.update(mov.id, {"estado_conciliacion": "conciliado"})
+            
         for mov in movimientos_auxiliar:
-            db.add(ConciliacionManualAuxiliar(id_conciliacion_manual=conciliacion_manual.id, id_movimiento_auxiliar=mov.id))
-            mov.estado_conciliacion = 'conciliado'  # Actualizar estado del movimiento
-
-        db.commit()
+            manual_repo.create_auxiliar_item({
+                "id_conciliacion_manual": conciliacion_manual.id,
+                "id_movimiento_auxiliar": mov.id
+            })
+            movimiento_repo.update(mov.id, {"estado_conciliacion": "conciliado"})
 
         return {
             'success': True,
@@ -515,7 +531,11 @@ def eliminar_conciliacion_manual(match_id, db):
         dict con el resultado de la operación
     """
     try:
-        # Buscar el match
+        factory = RepositoryFactory(db)
+        match_repo = factory.get_match_repository()
+        movimiento_repo = factory.get_movimiento_repository()
+        
+        # Buscar el match (usando db.query por el filtro LIKE complejo)
         match = db.query(ConciliacionMatch).filter(
             and_(
                 ConciliacionMatch.id == match_id,
@@ -530,24 +550,18 @@ def eliminar_conciliacion_manual(match_id, db):
             }
         
         # Obtener los movimientos
-        mov_banco = db.query(Movimiento).filter(
-            Movimiento.id == match.id_movimiento_banco
-        ).first()
-        
-        mov_auxiliar = db.query(Movimiento).filter(
-            Movimiento.id == match.id_movimiento_auxiliar
-        ).first()
+        mov_banco = movimiento_repo.get_by_id(match.id_movimiento_banco)
+        mov_auxiliar = movimiento_repo.get_by_id(match.id_movimiento_auxiliar)
         
         # Restaurar estado de los movimientos
         if mov_banco:
-            mov_banco.estado_conciliacion = 'no_conciliado'
+            movimiento_repo.update(mov_banco.id, {"estado_conciliacion": "no_conciliado"})
         
         if mov_auxiliar:
-            mov_auxiliar.estado_conciliacion = 'no_conciliado'
+            movimiento_repo.update(mov_auxiliar.id, {"estado_conciliacion": "no_conciliado"})
         
         # Eliminar el match
-        db.delete(match)
-        db.commit()
+        match_repo.delete(match_id)
         
         return {
             'success': True,
