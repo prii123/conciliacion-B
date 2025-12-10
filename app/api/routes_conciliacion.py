@@ -7,7 +7,7 @@ import io, pandas as pd
 
 from app.utils.utils import validar_excel
 from app.utils.file_validation import validar_archivo_csv, validar_numeros_debito_credito, formatear_datos_para_movimientos, agrupar_movimientos_por_mes_y_guardar
-from app.utils.auth import get_current_active_user
+from app.utils.auth import get_current_active_user, verify_access_to_conciliacion
 from ..database import get_db
 from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar, User
 from fastapi.encoders import jsonable_encoder
@@ -29,7 +29,13 @@ def lista_conciliaciones_json(
     conciliacion_repo = factory.get_conciliacion_repository()
     movimiento_repo = factory.get_movimiento_repository()
     
-    conciliaciones = conciliacion_repo.get_all(order_by='id', desc_order=True)
+    # Filtrar conciliaciones según el rol del usuario
+    if current_user.role == 'administrador':
+        # Administrador ve todas las conciliaciones
+        conciliaciones = conciliacion_repo.get_all(order_by='id', desc_order=True)
+    else:
+        # Usuario normal solo ve las suyas
+        conciliaciones = conciliacion_repo.get_by_usuario(current_user.id)
 
     conciliaciones_por_empresa = {}
     for c in conciliaciones:
@@ -80,6 +86,13 @@ def detalle_conciliacion_json(
     conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
     if not conciliacion:
         raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+    
+    # Verificar acceso según rol
+    if not verify_access_to_conciliacion(conciliacion, current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para acceder a esta conciliación"
+        )
 
     movimientos = movimiento_repo.get_by_conciliacion(conciliacion_id)
     movimientos_no_conciliados = {
@@ -246,6 +259,7 @@ async def upload_files(
         
         conciliacion_data = {
             "id_empresa": id_empresa,
+            "id_usuario_creador": current_user.id,  # Asignar el usuario creador
             "fecha_proceso": datetime.now().strftime("%Y-%m-%d"),
             "nombre_archivo_banco": file_banco.filename,
             "nombre_archivo_auxiliar": file_auxiliar.filename,

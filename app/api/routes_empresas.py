@@ -19,7 +19,13 @@ def lista_empresas(
 ):
     factory = RepositoryFactory(db)
     empresa_repo = factory.get_empresa_repository()
-    empresas = empresa_repo.get_all(order_by='id', desc_order=True)
+    
+    # Si es administrador, ve todas las empresas. Si es usuario, solo las suyas
+    if current_user.role == "administrador":
+        empresas = empresa_repo.get_all(order_by='id', desc_order=True)
+    else:
+        empresas = empresa_repo.get_by_usuario(current_user.id)
+    
     return JSONResponse(content={"empresas": [EmpresaSchema.from_orm(e).dict() for e in empresas]})
 
 @router.post("/nueva", name="nueva_empresa_post")
@@ -40,7 +46,8 @@ def nueva_empresa_post(
         "nit": empresa.nit,
         "razon_social": empresa.razon_social,
         "nombre_comercial": empresa.nombre_comercial,
-        "ciudad": empresa.ciudad
+        "ciudad": empresa.ciudad,
+        "id_usuario_creador": current_user.id  # Asignar creador
     }
     nueva_empresa = empresa_repo.create(empresa_data)
     return JSONResponse(content={"message": "Empresa creada exitosamente", "empresa": EmpresaSchema.from_orm(nueva_empresa).dict()})

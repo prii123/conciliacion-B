@@ -33,6 +33,9 @@ class SQLAlchemyUserRepository(IUserRepository):
     def get_by_email(self, email: str):
         return self.db.query(User).filter(User.email == email).first()
     
+    def get_all(self) -> List:
+        return self.db.query(User).order_by(desc(User.created_at)).all()
+    
     def create(self, user_data: Dict[str, Any]):
         user = User(**user_data)
         self.db.add(user)
@@ -76,6 +79,12 @@ class SQLAlchemyEmpresaRepository(IEmpresaRepository):
         else:
             query = query.order_by(asc(getattr(Empresa, order_by)))
         return query.all()
+    
+    def get_by_usuario(self, usuario_id: int) -> List:
+        return (self.db.query(Empresa)
+                .filter(Empresa.id_usuario_creador == usuario_id)
+                .order_by(desc(Empresa.fecha_creacion))
+                .all())
     
     def create(self, empresa_data: Dict[str, Any]):
         empresa = Empresa(**empresa_data)
@@ -121,6 +130,12 @@ class SQLAlchemyConciliacionRepository(IConciliacionRepository):
     def get_by_empresa(self, empresa_id: int) -> List:
         return self.db.query(Conciliacion).filter(
             Conciliacion.id_empresa == empresa_id
+        ).order_by(desc(Conciliacion.id)).all()
+    
+    def get_by_usuario(self, usuario_id: int) -> List:
+        """Obtiene todas las conciliaciones creadas por un usuario"""
+        return self.db.query(Conciliacion).filter(
+            Conciliacion.id_usuario_creador == usuario_id
         ).order_by(desc(Conciliacion.id)).all()
     
     def create(self, conciliacion_data: Dict[str, Any]):

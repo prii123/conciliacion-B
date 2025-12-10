@@ -3,8 +3,6 @@
  * Gestión de empresas con carga dinámica, búsqueda y filtros
  */
 
-import { BASE_URL } from "./config.js";
-
 const EmpresasManager = {
     empresas: [],
     empresasFiltradas: [],
@@ -13,6 +11,12 @@ const EmpresasManager = {
      * Inicializa el módulo
      */
     init() {
+        // Verificar autenticación
+        if (!Auth.isAuthenticated()) {
+            console.log('Usuario no autenticado, redirigiendo a login...');
+            window.location.href = '/login';
+            return;
+        }
         this.cargarEmpresas = this.cargarEmpresas.bind(this); // Asegurar el contexto
         this.cargarEmpresas();
         this.configurarEventos();
@@ -59,7 +63,7 @@ const EmpresasManager = {
             this.mostrarCargando(tbody);
 
             // Usar Auth.get para cargar empresas con autenticación
-            const empresasData = await Auth.get(`${BASE_URL}/api/empresas/`);
+            const empresasData = await Auth.get(`${window.API_BASE_URL}/api/empresas/`);
 
             // Registrar la respuesta para depuración
             // console.log('Respuesta de la API:', empresasData);

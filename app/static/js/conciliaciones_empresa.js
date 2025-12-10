@@ -1,12 +1,17 @@
-import { BASE_URL } from "./config.js";
-
 async function fetchConciliaciones(empresaId) {
+    // Verificar autenticación
+    if (!Auth.isAuthenticated()) {
+        console.log('Usuario no autenticado, redirigiendo a login...');
+        window.location.href = '/login';
+        return;
+    }
+
     try {
         if (!empresaId) {
             throw new Error("El ID de la empresa (empresaId) es inválido o no está definido.");
         }
 
-        const url = `${BASE_URL}/api/empresas/${empresaId}/conciliaciones`;
+        const url = `${window.API_BASE_URL}/api/empresas/${empresaId}/conciliaciones`;
         // console.log("Fetching data from:", url);
 
         // Usar Auth.get para obtener conciliaciones con autenticación
@@ -73,7 +78,7 @@ window.generarInforme = async function (conciliacionId) {
         const token = Auth.getToken();
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         
-        const response = await fetch(`${BASE_URL}/api/informes/${conciliacionId}`, {
+        const response = await fetch(`${window.API_BASE_URL}/api/informes/${conciliacionId}`, {
             headers
         });
         

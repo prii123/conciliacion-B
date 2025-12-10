@@ -26,6 +26,11 @@ class IUserRepository(ABC):
         pass
     
     @abstractmethod
+    def get_all(self) -> List:
+        """Obtiene todos los usuarios"""
+        pass
+    
+    @abstractmethod
     def create(self, user_data: Dict[str, Any]):
         """Crea un nuevo usuario"""
         pass
@@ -60,6 +65,11 @@ class IEmpresaRepository(ABC):
         pass
     
     @abstractmethod
+    def get_by_usuario(self, usuario_id: int) -> List:
+        """Obtiene todas las empresas creadas por un usuario"""
+        pass
+    
+    @abstractmethod
     def create(self, empresa_data: Dict[str, Any]):
         """Crea una nueva empresa"""
         pass
@@ -91,6 +101,11 @@ class IConciliacionRepository(ABC):
     @abstractmethod
     def get_by_empresa(self, empresa_id: int) -> List:
         """Obtiene todas las conciliaciones de una empresa"""
+        pass
+    
+    @abstractmethod
+    def get_by_usuario(self, usuario_id: int) -> List:
+        """Obtiene todas las conciliaciones creadas por un usuario"""
         pass
     
     @abstractmethod

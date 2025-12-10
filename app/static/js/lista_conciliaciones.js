@@ -1,14 +1,19 @@
-import { BASE_URL } from "./config.js";
-
 // Variable global para almacenar los datos originales
 let originalData = {};
 
 document.addEventListener("DOMContentLoaded", async () => {
+    // Verificar autenticación antes de cargar datos
+    if (!Auth.isAuthenticated()) {
+        console.log('Usuario no autenticado, redirigiendo a login...');
+        window.location.href = '/login';
+        return;
+    }
+
     const container = document.querySelector("#conciliaciones-container");
 
     try {
-        // Usar Auth.get en lugar de fetch directo
-        const data = await Auth.get(`${BASE_URL}/api/conciliaciones/`);
+        // Usar window.API_BASE_URL
+        const data = await Auth.get(`${window.API_BASE_URL}/api/conciliaciones/`);
         
         // Almacenar los datos originales
         originalData = data;

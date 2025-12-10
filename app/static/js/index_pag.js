@@ -1,5 +1,3 @@
-import { BASE_URL } from "./config.js";
-
 document.addEventListener('DOMContentLoaded', function () {
         FileHandler.init('file_banco', 'label_banco', 'name_banco');
         FileHandler.init('file_auxiliar', 'label_auxiliar', 'name_auxiliar');
@@ -9,12 +7,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 document.addEventListener("DOMContentLoaded", async () => {
+    // Verificar autenticación
+    if (!Auth.isAuthenticated()) {
+        console.log('Usuario no autenticado, redirigiendo a login...');
+        window.location.href = '/login';
+        return;
+    }
+
     // Cargar empresas
     const selectEmpresa = document.getElementById("id_empresa");
 
     try {
         // Usar Auth.get en lugar de fetch directo
-        const data = await Auth.get(`${BASE_URL}/api/empresas/`);
+        const data = await Auth.get(`${window.API_BASE_URL}/api/empresas/`);
 
         // console.log(data); // Verificar la estructura de la respuesta
 
@@ -50,7 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             try {
                 // Usar Auth.post para enviar con autenticación
-                const result = await Auth.post(`${BASE_URL}/api/conciliaciones/upload`, formData);
+                const result = await Auth.post(`${window.API_BASE_URL}/api/conciliaciones/upload`, formData);
 
                 // Mostrar mensaje de éxito
                 console.log("Archivos cargados exitosamente:", result);
@@ -68,7 +73,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
         // Usar Auth.get para cargar empresas con autenticación
-        const empresasData = await Auth.get(`${BASE_URL}/api/empresas/`);
+        const empresasData = await Auth.get(`${window.API_BASE_URL}/api/empresas/`);
 
         const empresas = Array.isArray(empresasData) ? empresasData : empresasData.empresas || [];
         empresas.forEach(emp => {
@@ -142,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             try {
                 // Usar Auth.post para enviar con autenticación
-                const result = await Auth.post(`${BASE_URL}/api/conciliaciones/upload_individual`, formData);
+                const result = await Auth.post(`${window.API_BASE_URL}/api/conciliaciones/upload_individual`, formData);
                 
                 console.log("Archivo individual cargado exitosamente:", result);
                 alert("Archivo cargado exitosamente.");

@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, Literal
 
 # ========== Schemas de Autenticación ==========
 class UserBase(BaseModel):
@@ -8,10 +8,12 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    role: Optional[Literal['administrador', 'usuario']] = 'usuario'
 
 class UserResponse(UserBase):
     id: int
     is_active: bool
+    role: str
     created_at: str
 
     class Config:

@@ -1,11 +1,15 @@
-import { BASE_URL } from "./config.js";
-
 /**
  * Manejo del formulario para agregar movimientos a una conciliación
  */
 
 class AgregarMovimientos {
     constructor() {
+        // Verificar autenticación
+        if (!Auth.isAuthenticated()) {
+            console.log('Usuario no autenticado, redirigiendo a login...');
+            window.location.href = '/login';
+            return;
+        }
         this.init();
     }
 
@@ -85,7 +89,7 @@ class AgregarMovimientos {
         const originalText = submitBtn.innerHTML;
         
         // console.log('Enviando formulario con ID de conciliación:', conciliacionId);
-        // console.log('URL completa que se va a usar:', `${BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`);
+        // console.log('URL completa que se va a usar:', `${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`);
         
         // Mostrar estado de carga
         submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Procesando...';
@@ -94,7 +98,7 @@ class AgregarMovimientos {
         try {
             // Usar Auth.post para enviar con autenticación
             const result = await Auth.post(
-                `${BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`,
+                `${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/agregar_movimientos`,
                 formData
             );
             

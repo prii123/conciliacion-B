@@ -15,6 +15,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    role = Column(String, default='usuario')  # 'administrador' o 'usuario'
     created_at = Column(String)
 
 
@@ -34,6 +35,7 @@ class Empresa(Base):
     ciudad = Column(String)
     estado = Column(String, default='activa')          # 'activa' o 'inactiva'
     fecha_creacion = Column(String)
+    id_usuario_creador = Column(Integer, ForeignKey("users.id"), nullable=True)  # Usuario que creó la empresa
     
     # Relación uno-a-muchos con Conciliaciones
     conciliaciones = relationship("Conciliacion", back_populates="empresa")
@@ -42,6 +44,7 @@ class Conciliacion(Base):
     __tablename__ = 'conciliaciones'
     id = Column(Integer, primary_key=True)
     id_empresa = Column(Integer, ForeignKey("empresas.id"), nullable=False)
+    id_usuario_creador = Column(Integer, ForeignKey("users.id"), nullable=True)  # Usuario que creó la conciliación
     fecha_proceso = Column(String)
     nombre_archivo_banco = Column(String)
     nombre_archivo_auxiliar = Column(String)

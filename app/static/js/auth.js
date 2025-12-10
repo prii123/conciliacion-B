@@ -4,7 +4,8 @@
  */
 
 const Auth = {
-    TOKEN_KEY: 'access_token',
+    TOKEN_KEY: 'token',
+    // TOKEN_KEY: 'access_token',
 
     /**
      * Obtiene el token de las cookies
@@ -195,6 +196,43 @@ const Auth = {
         }
         
         return await response.json();
+    },
+
+    /**
+     * Obtiene la información del usuario actual
+     */
+    async getCurrentUser() {
+        try {
+            // Asegurarse de que API_BASE_URL esté definido
+            const baseUrl = window.API_BASE_URL || 'http://localhost:8000';
+            console.log('getCurrentUser - Using API_BASE_URL:', baseUrl);
+            
+            const response = await fetch(`${baseUrl}/api/auth/me`, {
+                credentials: 'include',
+                headers: this.getAuthHeaders()
+            });
+            
+            console.log('getCurrentUser - Response status:', response.status);
+            
+            // Si es 401, el token expiró o es inválido
+            if (response.status === 401) {
+                console.log('getCurrentUser - Token inválido o expirado (401)');
+                this.removeToken();
+                return null;
+            }
+            
+            if (!response.ok) {
+                console.error('getCurrentUser - Error response:', response.status, response.statusText);
+                throw new Error('No se pudo obtener el usuario');
+            }
+            
+            const userData = await response.json();
+            console.log('getCurrentUser - User data:', userData);
+            return userData;
+        } catch (error) {
+            console.error('Error obteniendo usuario:', error);
+            return null;
+        }
     }
 };
 

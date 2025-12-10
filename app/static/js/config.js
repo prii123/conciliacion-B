@@ -5,4 +5,10 @@ const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000' 
     : window.location.origin;
 
-export const BASE_URL = API_BASE_URL;
+// Hacer disponible globalmente
+window.API_BASE_URL = API_BASE_URL;
+
+// Para compatibilidad con código antiguo
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { API_BASE_URL };
+}

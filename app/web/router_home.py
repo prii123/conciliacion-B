@@ -27,3 +27,7 @@ def error(request: Request):
 @router.get("/success", name="success")
 def success(request: Request):
     return templates.TemplateResponse("success.html", {"request": request})
+
+@router.get("/usuarios", name="usuarios")
+def usuarios(request: Request):
+    return templates.TemplateResponse("usuarios.html", {"request": request})
