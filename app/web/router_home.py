@@ -31,3 +31,7 @@ def success(request: Request):
 @router.get("/usuarios", name="usuarios")
 def usuarios(request: Request):
     return templates.TemplateResponse("usuarios.html", {"request": request})
+
+@router.get("/estadisticas", name="estadisticas")
+def estadisticas(request: Request):
+    return templates.TemplateResponse("estadisticas.html", {"request": request})

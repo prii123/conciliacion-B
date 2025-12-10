@@ -1,0 +1,281 @@
+// Verificar autenticación al cargar la página
+document.addEventListener('DOMContentLoaded', async function() {
+    if (!Auth.isAuthenticated()) {
+        window.location.href = '/login';
+        return;
+    }
+
+    try {
+        const user = await Auth.getCurrentUser();
+        if (!user || user.role !== 'administrador') {
+            alert('Acceso denegado. Esta página es solo para administradores.');
+            window.location.href = '/';
+            return;
+        }
+
+        // Cargar datos
+        await Promise.all([
+            cargarResumen(),
+            cargarEstadisticas()
+        ]);
+    } catch (error) {
+        console.error('Error verificando permisos:', error);
+        alert('Error al verificar permisos');
+    }
+});
+
+/**
+ * Carga el resumen general de estadísticas
+ */
+async function cargarResumen() {
+    try {
+        const response = await fetch(`${window.API_BASE_URL}/api/estadisticas/resumen`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al cargar resumen');
+        }
+
+        const resumen = await response.json();
+        mostrarResumen(resumen);
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('resumenContainer').innerHTML = 
+            '<div class="col-12"><div class="alert alert-danger">Error al cargar resumen</div></div>';
+    }
+}
+
+/**
+ * Muestra el resumen general en tarjetas
+ */
+function mostrarResumen(resumen) {
+    const container = document.getElementById('resumenContainer');
+    
+    const cards = [
+        {
+            title: resumen.total_empresas,
+            subtitle: 'Empresas Registradas',
+            icon: 'bi-building',
+            gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        },
+        {
+            title: resumen.total_conciliaciones,
+            subtitle: 'Total Conciliaciones',
+            icon: 'bi-file-earmark-check',
+            gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+        },
+        {
+            title: resumen.conciliaciones_completadas,
+            subtitle: 'Completadas',
+            icon: 'bi-check-circle',
+            gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+        },
+        {
+            title: resumen.conciliaciones_en_proceso,
+            subtitle: 'En Proceso',
+            icon: 'bi-clock-history',
+            gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+        }
+    ];
+
+    container.innerHTML = cards.map(card => `
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="stats-card" style="background: ${card.gradient}">
+                <div class="card-body position-relative">
+                    <h3>${card.title}</h3>
+                    <p>${card.subtitle}</p>
+                    <i class="bi ${card.icon} stats-icon"></i>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Carga las estadísticas detalladas por empresa
+ */
+async function cargarEstadisticas() {
+    try {
+        const response = await fetch(`${window.API_BASE_URL}/api/estadisticas`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al cargar estadísticas');
+        }
+
+        const estadisticas = await response.json();
+        mostrarEstadisticas(estadisticas);
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('estadisticasContainer').innerHTML = 
+            '<div class="col-12"><div class="alert alert-danger">Error al cargar estadísticas</div></div>';
+    }
+}
+
+/**
+ * Muestra las estadísticas agrupadas por empresa
+ */
+function mostrarEstadisticas(estadisticas) {
+    const container = document.getElementById('estadisticasContainer');
+    
+    if (estadisticas.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <h4>No hay estadísticas disponibles</h4>
+                <p>No se han registrado conciliaciones aún</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Obtener fecha actual
+    const ahora = new Date();
+    const añoActual = ahora.getFullYear();
+    const mesActual = ahora.getMonth() + 1; // 1-12
+
+    // Nombres de meses
+    const mesesNombres = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    // Agrupar por empresa
+    const empresasMap = {};
+    estadisticas.forEach(stat => {
+        if (!empresasMap[stat.empresa_id]) {
+            empresasMap[stat.empresa_id] = {
+                nombre: stat.empresa_nombre,
+                años: {}
+            };
+        }
+        
+        if (!empresasMap[stat.empresa_id].años[stat.año]) {
+            empresasMap[stat.empresa_id].años[stat.año] = {};
+        }
+        
+        empresasMap[stat.empresa_id].años[stat.año][stat.mes] = stat;
+    });
+
+    // Generar HTML
+    let html = '';
+    
+    Object.values(empresasMap).forEach(empresa => {
+        html += `
+            <div class="empresa-card">
+                <div class="empresa-header">
+                    <i class="bi bi-building me-2"></i>${escapeHtml(empresa.nombre)}
+                </div>
+        `;
+        
+        // Obtener todos los años y ordenar descendente
+        const años = Object.keys(empresa.años).map(Number).sort((a, b) => b - a);
+        
+        años.forEach((año, index) => {
+            const esAñoActual = año === añoActual;
+            const yearId = `year-${empresa.nombre.replace(/\s+/g, '-')}-${año}`;
+            const showClass = ''; // Todos colapsados por defecto
+            const toggleClass = 'collapsed';
+            
+            // Calcular total de conciliaciones del año
+            const mesesConData = empresa.años[año];
+            let totalAño = 0;
+            Object.values(mesesConData).forEach(stat => {
+                totalAño += stat.total_conciliaciones;
+            });
+            
+            html += `
+                <div class="year-section">
+                    <div class="year-header" onclick="toggleYear('${yearId}')">
+                        <h5>
+                            <i class="bi bi-calendar-year me-2"></i>
+                            ${año}
+                            <span class="badge bg-primary ms-2">${totalAño} conciliaciones</span>
+                        </h5>
+                        <i class="bi bi-chevron-down year-toggle ${toggleClass}" id="toggle-${yearId}"></i>
+                    </div>
+                    <div class="year-collapse ${showClass}" id="${yearId}">
+                        <div class="months-grid">
+            `;
+            
+            // Generar los 12 meses
+            for (let mes = 1; mes <= 12; mes++) {
+                const mesData = mesesConData[mes];
+                const mesNombre = mesesNombres[mes - 1];
+                
+                // Determinar el estado del mes
+                let cardClass = '';
+                let statsHtml = '';
+                
+                if (año > añoActual || (año === añoActual && mes > mesActual)) {
+                    // Mes futuro
+                    cardClass = 'future';
+                    statsHtml = '<small>Futuro</small>';
+                } else if (mesData && mesData.total_conciliaciones > 0) {
+                    // Mes con conciliaciones
+                    cardClass = 'completed';
+                    statsHtml = `
+                        <div class="month-stats">
+                            <div class="month-stat">
+                                <i class="bi bi-check-circle"></i>
+                                <span>${mesData.completadas}</span>
+                            </div>
+                            <div class="month-stat">
+                                <i class="bi bi-clock"></i>
+                                <span>${mesData.en_proceso}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Mes sin conciliaciones (pasado o actual)
+                    cardClass = 'pending';
+                    statsHtml = '<small><i class="bi bi-exclamation-circle me-1"></i>Sin conciliaciones</small>';
+                }
+                
+                html += `
+                    <div class="month-card ${cardClass}">
+                        <div class="month-name">${mesNombre}</div>
+                        ${statsHtml}
+                    </div>
+                `;
+            }
+            
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+/**
+ * Toggle del año (colapsar/expandir)
+ */
+function toggleYear(yearId) {
+    const yearCollapse = document.getElementById(yearId);
+    const toggleIcon = document.getElementById(`toggle-${yearId}`);
+    
+    if (yearCollapse.classList.contains('show')) {
+        yearCollapse.classList.remove('show');
+        toggleIcon.classList.add('collapsed');
+    } else {
+        yearCollapse.classList.add('show');
+        toggleIcon.classList.remove('collapsed');
+    }
+}
+
+/**
+ * Escapa HTML para prevenir XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}

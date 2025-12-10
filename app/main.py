@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import routes_auth, routes_conciliacion, routes_empresas
+from app.api import routes_auth, routes_conciliacion, routes_empresas, routes_estadisticas
 from pathlib import Path
 import os
 
@@ -40,6 +40,7 @@ app.include_router(routes_auth.router, prefix="/api/auth", tags=["autenticacion"
 app.include_router(routes_conciliacion.router, prefix="/api/conciliaciones", tags=["conciliaciones"])
 app.include_router(routes_empresas.router, prefix="/api/empresas", tags=["empresas"])
 app.include_router(routes_informes.router, prefix="/api/informes", tags=["Informes"])
+app.include_router(routes_estadisticas.router, prefix="/api", tags=["estadisticas"])
 
 
 # Registrar rutas WEB

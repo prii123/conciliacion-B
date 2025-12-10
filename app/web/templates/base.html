@@ -45,14 +45,14 @@
                             <i class="bi bi-building me-1"></i>Empresas
                         </a>
                     </li>
+                    <li class="nav-item d-none" id="estadisticasNavItem">
+                        <a class="nav-link {% if request.path == '/estadisticas' %}active{% endif %}" href="/estadisticas">
+                            <i class="bi bi-graph-up-arrow me-1"></i>Estadísticas
+                        </a>
+                    </li>
                     <li class="nav-item d-none" id="usuariosNavItem">
                         <a class="nav-link {% if request.path == '/usuarios' %}active{% endif %}" href="/usuarios">
                             <i class="bi bi-people me-1"></i>Usuarios
-                        </a>
-                    </li>
-                    <li class="nav-item d-none" id="guiaNavItem">
-                        <a class="nav-link" href="{{ url_for('guia') }}">
-                            <i class="bi bi-book me-1"></i>Guía de Uso
                         </a>
                     </li>
                      <li class="nav-item d-none" id="plantillaNavItem">
@@ -106,9 +106,9 @@
             const loginNavItem = document.getElementById('loginNavItem');
             const logoutNavItem = document.getElementById('logoutNavItem');
             const usuariosNavItem = document.getElementById('usuariosNavItem');
+            const estadisticasNavItem = document.getElementById('estadisticasNavItem');
             const conciliacionesNavItem = document.getElementById('conciliacionesNavItem');
             const empresasNavItem = document.getElementById('empresasNavItem');
-            const guiaNavItem = document.getElementById('guiaNavItem');
             const plantillaNavItem = document.getElementById('plantillaNavItem');
             
             console.log('Verificando autenticación...');
@@ -123,18 +123,20 @@
                 // Mostrar menús de usuario autenticado
                 if (conciliacionesNavItem) conciliacionesNavItem.classList.remove('d-none');
                 if (empresasNavItem) empresasNavItem.classList.remove('d-none');
-                if (guiaNavItem) guiaNavItem.classList.remove('d-none');
                 if (plantillaNavItem) plantillaNavItem.classList.remove('d-none');
                 
-                // Verificar si es administrador para mostrar menú de usuarios
+                // Verificar si es administrador para mostrar menús de admin
                 try {
                     const user = await Auth.getCurrentUser();
                     console.log('Usuario obtenido:', user);
                     
                     if (user && user.role === 'administrador') {
-                        console.log('Usuario es administrador, mostrando menú de usuarios');
+                        console.log('Usuario es administrador, mostrando menús de admin');
                         if (usuariosNavItem) {
                             usuariosNavItem.classList.remove('d-none');
+                        }
+                        if (estadisticasNavItem) {
+                            estadisticasNavItem.classList.remove('d-none');
                         }
                     } else {
                         console.log('Usuario NO es administrador, rol:', user?.role);
@@ -152,7 +154,7 @@
                 if (conciliacionesNavItem) conciliacionesNavItem.classList.add('d-none');
                 if (empresasNavItem) empresasNavItem.classList.add('d-none');
                 if (usuariosNavItem) usuariosNavItem.classList.add('d-none');
-                if (guiaNavItem) guiaNavItem.classList.add('d-none');
+                if (estadisticasNavItem) estadisticasNavItem.classList.add('d-none');
                 if (plantillaNavItem) plantillaNavItem.classList.add('d-none');
             }
         });

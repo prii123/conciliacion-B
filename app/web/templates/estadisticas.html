@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Panel de Estadísticas - Sistema de Conciliación{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .stats-card .card-body {
+        padding: 1.5rem;
+    }
+    
+    .stats-card h3 {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .stats-card p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 0.95rem;
+    }
+    
+    .stats-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    
+    .empresa-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    
+    .empresa-header {
+        background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .year-section {
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .year-header {
+        background: #f7fafc;
+        padding: 1rem 1.5rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        user-select: none;
+    }
+    
+    .year-header:hover {
+        background: #edf2f7;
+    }
+    
+    .year-header h5 {
+        margin: 0;
+        font-weight: 600;
+        color: #2d3748;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .year-toggle {
+        font-size: 1.2rem;
+        transition: transform 0.3s ease;
+        color: #667eea;
+    }
+    
+    .year-toggle.collapsed {
+        transform: rotate(-90deg);
+    }
+    
+    .months-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+    
+    .month-card {
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+    
+    .month-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .month-card.completed {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+        border-color: #2f855a;
+    }
+    
+    .month-card.pending {
+        background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
+        color: white;
+        border-color: #dd6b20;
+    }
+    
+    .month-card.future {
+        background: #e2e8f0;
+        color: #718096;
+    }
+    
+    .month-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .month-stats {
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    .month-stat {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #a0aec0;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
+    }
+    
+    .year-collapse {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+    }
+    
+    .year-collapse.show {
+        max-height: 2000px;
+        transition: max-height 0.5s ease-in;
+    }
+    
+    .month-card.destacado {
+        border: 3px solid #ffc107 !important;
+        box-shadow: 0 0 15px rgba(255, 193, 7, 0.5) !important;
+        transform: scale(1.05);
+    }
+    
+    .stats-card.clickable:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="mb-4 d-flex justify-content-between align-items-center">
+        <div>
+            <h2><i class="bi bi-graph-up-arrow me-2"></i>Panel de Estadísticas</h2>
+            <p class="text-muted mb-0">Resumen de conciliaciones por empresa</p>
+        </div>
+        <div>
+            <label for="yearSelector" class="form-label mb-1">Año:</label>
+            <select id="yearSelector" class="form-select" style="width: 150px;">
+                <option value="">Cargando...</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Resumen General -->
+    <div class="row mb-4" id="resumenContainer">
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meses Pendientes -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card" style="border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                <div class="card-header bg-warning text-white" style="border-radius: 12px 12px 0 0;">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Meses Pendientes por Conciliar</h5>
+                </div>
+                <div class="card-body" id="mesesPendientesContainer">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-warning" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas por Empresa -->
+    <div id="estadisticasContainer">
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando estadísticas...</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='js/estadisticas.js') }}"></script>
+{% endblock %}
