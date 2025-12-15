@@ -395,7 +395,7 @@ document.addEventListener('change', e => {
 const element = document.getElementById('some-element-id'); // Reemplazar con el ID correcto
 if (element) {
     element.addEventListener('click', () => {
-        console.log('Elemento clickeado');
+        // console.log('Elemento clickeado');
     });
 } else {
     console.warn('El elemento con ID "some-element-id" no existe en el DOM.');

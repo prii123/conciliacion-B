@@ -10,7 +10,7 @@
     <div class="alert alert-danger mt-3">{{ error }}</div>
     {% endif %} 
 
-    <form method="post" class="mt-3">
+    <form method="post" class="mt-3" onsubmit="return false;">
         <div class="mb-3">
             <label for="nit" class="form-label">NIT</label>
             <input type="text" name="nit" id="nit" class="form-control" required value="{{ nit or '' }}">
@@ -46,7 +46,7 @@
             <input type="text" name="ciudad" id="ciudad" class="form-control" value="{{ ciudad or '' }}">
         </div>
 
-        <button type="submit" class="btn btn-primary">
+        <button type="button" class="btn btn-primary" id="btnGuardarEmpresa">
             <i class="bi bi-save me-2"></i>Guardar Empresa
         </button>
         <a href="{{ url_for('lista_empresas') }}" class="btn btn-secondary ms-2">
@@ -57,5 +57,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/nueva_empresa.js" type="module"></script>
+<script src="/static/js/config.js"></script>
+<script src="/static/js/nueva_empresa.js"></script>
 {% endblock %}

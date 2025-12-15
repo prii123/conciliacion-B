@@ -259,7 +259,7 @@ async def upload_files(
         
         conciliacion_data = {
             "id_empresa": id_empresa,
-            "id_usuario_creador": current_user.id,  # Asignar el usuario creador
+            "id_usuario_creador": current_user.id,  # Asignar el usuario creador 
             "fecha_proceso": datetime.now().strftime("%Y-%m-%d"),
             "nombre_archivo_banco": file_banco.filename,
             "nombre_archivo_auxiliar": file_auxiliar.filename,
@@ -406,7 +406,8 @@ async def upload_individual(
             empresa_id, 
             cuenta_conciliada,
             archivo.filename,
-            db
+            db,
+            current_user.id
         )
 
         print("✓ Conciliaciones creadas:", resultado_guardado["conciliaciones_creadas"])

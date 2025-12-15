@@ -162,7 +162,7 @@ window.generarInforme = async function (conciliacionId) {
         const token = Auth.getToken();
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         
-        const response = await fetch(`${BASE_URL}/api/informes/${conciliacionId}`, {
+        const response = await fetch(`${window.API_BASE_URL}/api/informes/${conciliacionId}`, {
             headers
         });
         

@@ -1,26 +1,32 @@
-import { BASE_URL } from "./config.js";
-
-
 
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
+    const btnGuardar = document.getElementById('btnGuardarEmpresa');
 
-    form.addEventListener('submit', async function(event) {
-        event.preventDefault(); // Evitar el envío tradicional del formulario
-
+    btnGuardar.addEventListener('click', async function(event) {
+        event.preventDefault();
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
-        // console.log('Datos del formulario:', data);
-
         try {
-            // Usar Auth.post para enviar con autenticación
-            const result = await Auth.post(`${BASE_URL}/api/empresas/nueva`, data);
-            
-            // alert('Empresa creada exitosamente');
-            window.location.href = '/empresas'; // Redirigir a la lista de empresas
+            const result = await Auth.post(`${window.API_BASE_URL}/api/empresas/nueva`, data);
+            window.location.href = '/empresas';
         } catch (error) {
             console.error('Error al guardar la empresa:', error);
-            alert(`Error: ${error.message || 'Ocurrió un error al guardar la empresa. Intente nuevamente.'}`);
+            let errorMsg = 'Ocurrió un error al guardar la empresa. Intente nuevamente.';
+            if (error && error.message) {
+                errorMsg = error.message;
+            } else if (typeof error === 'string') {
+                errorMsg = error;
+            }
+            let errorDiv = document.getElementById('form-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.id = 'form-error';
+                errorDiv.className = 'alert alert-danger mt-3';
+                form.prepend(errorDiv);
+            }
+            errorDiv.textContent = errorMsg;
+            alert(`Error: ${errorMsg}`);
         }
     });
 });

@@ -1,4 +1,3 @@
-import { BASE_URL } from "./config.js";
 
 // =============================
 // DATOS DE MOVIMIENTOS (desde el DOM)
@@ -37,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadConciliacionDetails = async () => {
         try {
             // Usar Auth.get para cargar con autenticación
-            const data = await Auth.get(`${BASE_URL}/api/conciliaciones/${conciliacionId}`);
+            const data = await Auth.get(`${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}`);
 
             // console.log("Detalles de la conciliación cargados:", data);
             // console.log("Movimientos no conciliados (banco):", data.movimientos_no_conciliados.banco);
@@ -301,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Usar Auth.post para conciliación manual con autenticación
-                const data = await Auth.post(`${BASE_URL}/api/conciliaciones/${conciliacionId}/conciliar-manual`, payload);
+                const data = await Auth.post(`${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/conciliar-manual`, payload);
                 
                 if (data.message) {
                     // alert(data.message);
@@ -338,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // Usar Auth.post para procesar con autenticación
-            const data = await Auth.post(`${BASE_URL}/api/conciliaciones/${conciliacionId}/procesar`, {});
+            const data = await Auth.post(`${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/procesar`, {});
             
             // alert(data.message || "Conciliación procesada automáticamente con éxito.");
             window.location.reload();
@@ -356,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Usar Auth.post para terminar conciliación con autenticación
-                const data = await Auth.post(`${BASE_URL}/api/conciliaciones/${conciliacionId}/terminar_conciliacion`, {});
+                const data = await Auth.post(`${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/terminar_conciliacion`, {});
                 // alert(data.message || 'Conciliación terminada con éxito.');
                 window.location.reload();
             } catch (error) {
@@ -407,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Usar Auth.delete para eliminar con autenticación
-                await Auth.delete(`${BASE_URL}/api/conciliaciones/${conciliacionId}/eliminar`);
+                await Auth.delete(`${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/eliminar`);
                 // alert('Conciliación eliminada exitosamente');
                 window.location.href = '/conciliaciones';
             } catch (error) {

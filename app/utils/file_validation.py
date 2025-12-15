@@ -119,7 +119,7 @@ def formatear_datos_para_movimientos(contenido_str):
         "movimientos_formateados": movimientos_formateados
     }
 
-def agrupar_movimientos_por_mes_y_guardar(movimientos_formateados, empresa_id, cuenta_conciliada, nombre_archivo, db: Session):
+def agrupar_movimientos_por_mes_y_guardar(movimientos_formateados, empresa_id, cuenta_conciliada, nombre_archivo, db: Session, id_usuario_creador=None):
     """
     Agrupa los movimientos por mes, crea una conciliación por cada mes y guarda los movimientos asociados.
     """
@@ -179,6 +179,7 @@ def agrupar_movimientos_por_mes_y_guardar(movimientos_formateados, empresa_id, c
         # Crear nueva conciliación para este mes
         nueva_conciliacion = Conciliacion(
             id_empresa=empresa_id,
+            id_usuario_creador=id_usuario_creador,
             fecha_proceso=datetime.now().strftime("%Y-%m-%d"),
             nombre_archivo_banco="",  # No hay archivo banco en este caso
             nombre_archivo_auxiliar=nombre_archivo,

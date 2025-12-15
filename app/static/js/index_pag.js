@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
 document.addEventListener("DOMContentLoaded", async () => {
     // Verificar autenticación
     if (!Auth.isAuthenticated()) {
-        console.log('Usuario no autenticado, redirigiendo a login...');
+        // console.log('Usuario no autenticado, redirigiendo a login...');
         window.location.href = '/login';
         return;
     }
@@ -33,7 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
 
         selectEmpresa.addEventListener("change", () => {
-            console.log("Empresa seleccionada");
+            // console.log("Empresa seleccionada");
         });
     } catch (error) {
         console.error(error);
@@ -52,16 +52,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             event.preventDefault(); // Evitar el envío por defecto
 
             const formData = new FormData(uploadForm);
+                // Revertir cambios: no agregar id_usuario_creador
+                // const user = await Auth.getCurrentUser();
+                // if (user && user.id) {
+                //     formData.append('id_usuario_creador', user.id);
+                // }
 
             try {
                 // Usar Auth.post para enviar con autenticación
                 const result = await Auth.post(`${window.API_BASE_URL}/api/conciliaciones/upload`, formData);
 
                 // Mostrar mensaje de éxito
-                console.log("Archivos cargados exitosamente:", result);
+                // console.log("Archivos cargados exitosamente:", result);
                 window.location.reload();
             } catch (error) {
-                console.error("Error al enviar los archivos:", error);
+                // console.error("Error al enviar los archivos:", error);
                 alert(`Error: ${error.message || "Error al enviar los archivos. Intente nuevamente más tarde."}`);
             }
         });
@@ -144,12 +149,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             formData.append("empresa_id", empresaId);
             formData.append("cuenta_conciliada", cuentaBancaria);
             formData.append("archivo", archivoInput.files[0]);
+            // Agregar id_usuario_creador
+            const user = await Auth.getCurrentUser();
+            if (user && user.id) {
+                formData.append('id_usuario_creador', user.id);
+            }
 
             try {
                 // Usar Auth.post para enviar con autenticación
                 const result = await Auth.post(`${window.API_BASE_URL}/api/conciliaciones/upload_individual`, formData);
                 
-                console.log("Archivo individual cargado exitosamente:", result);
+                // console.log("Archivo individual cargado exitosamente:", result);
                 alert("Archivo cargado exitosamente.");
                 window.location.reload();
             } catch (error) {

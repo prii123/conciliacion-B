@@ -3,7 +3,7 @@ let usuarioAEliminar = null;
 
 // Verificar autenticación y permisos al cargar la página
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('=== INICIO VERIFICACIÓN DE ACCESO A USUARIOS ===');
+    // console.log('=== INICIO VERIFICACIÓN DE ACCESO A USUARIOS ===');
     
     // Verificar que Auth esté disponible
     if (typeof Auth === 'undefined') {
@@ -17,41 +17,41 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     if (!Auth.isAuthenticated()) {
-        console.log('Usuario no autenticado, redirigiendo a login...');
+        // console.log('Usuario no autenticado, redirigiendo a login...');
         window.location.href = '/login';
         return;
     }
 
     
-    console.log('Auth disponible:', Auth);
+    // console.log('Auth disponible:', Auth);
     
     // Verificar si está autenticado
     const isAuth = Auth.isAuthenticated();
-    console.log('¿Está autenticado?', isAuth);
-    console.log('Token en localStorage:', localStorage.getItem('token'));
-    console.log('Cookies:', document.cookie);
+    // console.log('¿Está autenticado?', isAuth);
+    // console.log('Token en localStorage:', localStorage.getItem('token'));
+    // console.log('Cookies:', document.cookie);
     
     // if (!isAuth) {
-    //     console.log('Usuario no autenticado, redirigiendo a login...');
+    //     // console.log('Usuario no autenticado, redirigiendo a login...');
     //     window.location.href = '/login';
     //     return;
     // }
 
     try {
         // Verificar si es administrador
-        console.log('Obteniendo información del usuario actual...');
+        // console.log('Obteniendo información del usuario actual...');
         const user = await Auth.getCurrentUser();
-        console.log('Usuario obtenido:', JSON.stringify(user, null, 2));
+        // console.log('Usuario obtenido:', JSON.stringify(user, null, 2));
         
         if (!user) {
-            console.log('ERROR: No se pudo obtener el usuario, pero hay token. Reintentando...');
+            // console.log('ERROR: No se pudo obtener el usuario, pero hay token. Reintentando...');
             // Esperar un poco y reintentar una vez más
             await new Promise(resolve => setTimeout(resolve, 500));
             const userRetry = await Auth.getCurrentUser();
-            console.log('Segundo intento - Usuario obtenido:', JSON.stringify(userRetry, null, 2));
+            // console.log('Segundo intento - Usuario obtenido:', JSON.stringify(userRetry, null, 2));
             
             if (!userRetry) {
-                console.log('ERROR: Fallo después de reintentar');
+                // console.log('ERROR: Fallo después de reintentar');
                 alert('Error al obtener información del usuario');
                 // window.location.href = '/login';
                 return;
@@ -59,27 +59,27 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Usar el resultado del reintento
             if (userRetry.role !== 'administrador') {
-                console.log('Usuario NO es administrador, redirigiendo...');
+                // console.log('Usuario NO es administrador, redirigiendo...');
                 alert('Acceso denegado. Esta página es solo para administradores.');
                 // window.location.href = '/';
                 return;
             }
             
-            console.log('✓ Usuario es administrador (después de reintento), cargando usuarios...');
+            // console.log('✓ Usuario es administrador (después de reintento), cargando usuarios...');
             await cargarUsuarios();
             return;
         }
         
-        console.log('Rol del usuario:', user.role);
+        // console.log('Rol del usuario:', user.role);
         
         if (user.role !== 'administrador') {
-            console.log('Usuario NO es administrador, redirigiendo...');
+            // console.log('Usuario NO es administrador, redirigiendo...');
             alert('Acceso denegado. Esta página es solo para administradores.');
             // window.location.href = '/';
             return;
         }
         
-        console.log('✓ Usuario es administrador, cargando usuarios...');
+        // console.log('✓ Usuario es administrador, cargando usuarios...');
         // Si llegó aquí, es administrador autenticado
         cargarUsuarios();
     } catch (error) {
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 /**
- * Carga la lista de usuarios desde la API
+ * Carga la lista de usuarios desde la API 
  */
 async function cargarUsuarios() {
     try {
@@ -98,7 +98,7 @@ async function cargarUsuarios() {
         });
 
         if (response.status === 401) {
-            console.log('Token expirado, redirigiendo a login...');
+            // console.log('Token expirado, redirigiendo a login...');
             Auth.removeToken();
             window.location.href = '/login';
             return;

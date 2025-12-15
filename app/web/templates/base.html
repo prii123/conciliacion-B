@@ -111,10 +111,10 @@
             const empresasNavItem = document.getElementById('empresasNavItem');
             const plantillaNavItem = document.getElementById('plantillaNavItem');
             
-            console.log('Verificando autenticación...');
+            // console.log('Verificando autenticación...');
             
             if (Auth.isAuthenticated()) {
-                console.log('Usuario autenticado, obteniendo información...');
+                // console.log('Usuario autenticado, obteniendo información...');
                 
                 // Ocultar login, mostrar logout
                 if (loginNavItem) loginNavItem.classList.add('d-none');
@@ -128,10 +128,10 @@
                 // Verificar si es administrador para mostrar menús de admin
                 try {
                     const user = await Auth.getCurrentUser();
-                    console.log('Usuario obtenido:', user);
+                    // console.log('Usuario obtenido:', user);
                     
                     if (user && user.role === 'administrador') {
-                        console.log('Usuario es administrador, mostrando menús de admin');
+                        // console.log('Usuario es administrador, mostrando menús de admin');
                         if (usuariosNavItem) {
                             usuariosNavItem.classList.remove('d-none');
                         }
@@ -139,13 +139,13 @@
                             estadisticasNavItem.classList.remove('d-none');
                         }
                     } else {
-                        console.log('Usuario NO es administrador, rol:', user?.role);
+                        // console.log('Usuario NO es administrador, rol:', user?.role);
                     }
                 } catch (err) {
                     console.error('Error verificando usuario:', err);
                 }
             } else {
-                console.log('Usuario no autenticado');
+                // console.log('Usuario no autenticado');
                 // Usuario no autenticado: mostrar solo login
                 if (loginNavItem) loginNavItem.classList.remove('d-none');
                 if (logoutNavItem) logoutNavItem.classList.add('d-none');

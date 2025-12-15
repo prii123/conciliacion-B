@@ -1,9 +1,9 @@
-import { BASE_URL } from "./config.js";
+
 
 async function fetchMatchesAndManuals(conciliacionId) {
     try {
         // Usar Auth.get para cargar con autenticación
-        const data = await Auth.get(`${BASE_URL}/api/conciliaciones/${conciliacionId}/matches_y_manuales`);
+        const data = await Auth.get(`${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/matches_y_manuales`);
         // console.log("Fetched data:", data);
         renderStats(data.stats);
         renderMatchesAndManuals(data);

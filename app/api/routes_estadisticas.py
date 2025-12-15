@@ -3,7 +3,7 @@ Rutas para estadísticas de conciliaciones
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, case
+from sqlalchemy import func, extract, case, cast, Date
 from app.database import get_db
 from app.models import User, Conciliacion, Empresa
 from app.utils.auth import get_current_admin_user
@@ -34,8 +34,8 @@ async def obtener_estadisticas(
     resultados = db.query(
         Empresa.id.label('empresa_id'),
         Empresa.razon_social.label('empresa_nombre'),
-        func.strftime('%Y', Conciliacion.fecha_proceso).label('año'),
-        func.strftime('%m', Conciliacion.fecha_proceso).label('mes'),
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'YYYY').label('año'),
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'MM').label('mes'),
         func.count(Conciliacion.id).label('total_conciliaciones'),
         func.sum(
             case(
@@ -52,16 +52,16 @@ async def obtener_estadisticas(
     ).join(
         Empresa, Conciliacion.id_empresa == Empresa.id
     ).filter(
-        func.strftime('%Y', Conciliacion.fecha_proceso) == str(año)
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'YYYY') == str(año)
     ).group_by(
         Empresa.id,
         Empresa.razon_social,
-        func.strftime('%Y', Conciliacion.fecha_proceso),
-        func.strftime('%m', Conciliacion.fecha_proceso)
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'YYYY'),
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'MM')
     ).order_by(
         Empresa.razon_social,
-        func.strftime('%Y', Conciliacion.fecha_proceso).desc(),
-        func.strftime('%m', Conciliacion.fecha_proceso).desc()
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'YYYY').desc(),
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'MM').desc()
     ).all()
 
     # Transformar resultados en diccionarios
@@ -118,9 +118,9 @@ async def obtener_años_disponibles(
     Obtiene la lista de años con conciliaciones registradas
     """
     años = db.query(
-        func.strftime('%Y', Conciliacion.fecha_proceso).label('año')
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'YYYY').label('año')
     ).distinct().order_by(
-        func.strftime('%Y', Conciliacion.fecha_proceso).desc()
+        func.to_char(cast(Conciliacion.fecha_proceso, Date), 'YYYY').desc()
     ).all()
     
     return [int(a.año) for a in años if a.año]
@@ -159,10 +159,10 @@ async def obtener_meses_pendientes(
     
     for empresa in empresas:
         meses_con_conciliacion = db.query(
-            func.strftime('%m', Conciliacion.fecha_proceso).label('mes')
+            func.to_char(cast(Conciliacion.fecha_proceso, Date), 'MM').label('mes')
         ).filter(
             Conciliacion.id_empresa == empresa.id,
-            func.strftime('%Y', Conciliacion.fecha_proceso) == str(año)
+            func.to_char(cast(Conciliacion.fecha_proceso, Date), 'YYYY') == str(año)
         ).distinct().all()
         
         meses_con_data = set(int(m.mes) for m in meses_con_conciliacion)
