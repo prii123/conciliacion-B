@@ -11,10 +11,10 @@ services:
       - .:/app
       # Mount generated reports directory
       - ./generated_reports:/app/generated_reports
-      # Mount database file
-      - ./conciliaciones.db:/app/conciliaciones.db
     environment:
-      - DATABASE_URL=sqlite:///./conciliaciones.db
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+      ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL}
     restart: unless-stopped
     networks:
       - conciliaciones-network
