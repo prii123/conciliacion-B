@@ -4,6 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import routes_auth, routes_conciliacion, routes_empresas, routes_estadisticas
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
 
 from app.api import routes_conciliacion, routes_empresas, routes_informes
 from app.web import router_conciliaciones, router_home

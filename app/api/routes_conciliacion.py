@@ -1,9 +1,15 @@
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, Request, Form, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 import io, pandas as pd
+import PyPDF2
+import openai
+import os
+import pdfplumber
+import json
+import re
 
 from app.utils.utils import validar_excel
 from app.utils.file_validation import validar_archivo_csv, validar_numeros_debito_credito, formatear_datos_para_movimientos, agrupar_movimientos_por_mes_y_guardar
@@ -603,5 +609,771 @@ def eliminar_conciliacion(
     return {"message": f"Conciliación #{conciliacion_id} y todos sus datos asociados eliminados con éxito."}
 
 
+@router.post("/upload-extracto/{conciliacion_id}")
+async def upload_extracto_bancario(
+    conciliacion_id: int,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    # prompt: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Sube un archivo PDF de extracto bancario y inicia el procesamiento asíncrono con DeepSeek.
+    """
+    print("🔍 Iniciando subida de extracto bancario...")
+    try:
+        print(f"👤 Usuario autenticado: {current_user.username if current_user else 'None'}")
+
+        # Verificar que la conciliación existe y pertenece al usuario
+        conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+        if not conciliacion:
+            print(f"❌ Error: Conciliación #{conciliacion_id} no encontrada")
+            raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+        # Verificar acceso según rol del usuario
+        if current_user.role != 'administrador' and conciliacion.id_usuario_creador != current_user.id:
+            print(f"❌ Error: Usuario {current_user.id} no tiene acceso a conciliación #{conciliacion_id}")
+            raise HTTPException(status_code=403, detail="No tienes permiso para acceder a esta conciliación")
+
+        print(f"✅ Conciliación #{conciliacion_id} validada para usuario {current_user.username}")
+
+        # Verificar que sea PDF
+        if not file.filename.lower().endswith('.pdf'):
+            print("❌ Error: Archivo no es PDF")
+            raise HTTPException(status_code=400, detail="El archivo debe ser un PDF")
+        print(f"✅ Archivo PDF válido: {file.filename}")
+
+        # Leer el contenido del PDF
+        content = await file.read()
+        print(f"📄 Contenido leído: {len(content)} bytes")
+
+        # Iniciar procesamiento en segundo plano
+        background_tasks.add_task(
+            process_and_load_extracto,
+            conciliacion_id=conciliacion_id,
+            content=content,
+            user_id=current_user.id
+        )
+
+        print("✅ Respuesta enviada al cliente, procesamiento continúa en background")
+        return JSONResponse(content={
+            "message": "Procesamiento de extracto bancario iniciado. El análisis con DeepSeek y la carga de movimientos puede tardar varios minutos. Refresca la página para ver el progreso.",
+            "conciliacion_id": conciliacion_id,
+            "estado": "iniciado"
+        })
+
+    except HTTPException:
+        # Re-lanzar excepciones HTTP sin modificar
+        raise
+    except Exception as e:
+        print(f"❌ Error inesperado en upload_extracto: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 
+async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_id: int):
+    """
+    Función de segundo plano que procesa el PDF con DeepSeek y carga los movimientos en la BD.
+    """
+    from app.database import SessionLocal
+    db = SessionLocal()  # Crear nueva sesión independiente
+
+    try:
+        print(f"🔄 Iniciando procesamiento en segundo plano para conciliación #{conciliacion_id} - Background task started")
+
+        # Verificar conciliación y usuario
+        conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+        if not conciliacion:
+            print(f"❌ Conciliación #{conciliacion_id} no encontrada")
+            return
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            print(f"❌ Usuario #{user_id} no encontrado")
+            return
+
+        # Verificar acceso
+        if user.role != 'administrador' and conciliacion.id_usuario_creador != user.id:
+            print(f"❌ Usuario {user.id} no tiene acceso a conciliación #{conciliacion_id}")
+            conciliacion.estado = 'error_acceso'
+            db.commit()
+            return
+
+        # Actualizar estado inicial
+        conciliacion.estado = 'procesando_extracto'
+        db.commit()
+        print(f"📝 Estado inicial establecido: procesando_extracto")
+
+        print("📄 Extrayendo texto del PDF...")
+        conciliacion.estado = 'extrayendo_texto'
+        db.commit()
+
+        # Extraer texto del PDF (igual que antes)
+        text_pages = []
+        try:
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                print(f"📖 PDF cargado con pdfplumber: {len(pdf.pages)} páginas")
+                total_pages = len(pdf.pages)
+                
+                for i, page in enumerate(pdf.pages):
+                    page_text = page.extract_text()
+                    if page_text and page_text.strip():
+                        text_pages.append(page_text.strip())
+                        print(f"📝 Página {i+1}: {len(page_text)} caracteres extraídos")
+                    else:
+                        print(f"⚠️ Página {i+1}: No se pudo extraer texto")
+                        
+        except Exception as e:
+            print(f"⚠️ Error con pdfplumber: {str(e)}, intentando con PyPDF2...")
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+            print(f"📖 PDF cargado con PyPDF2: {len(pdf_reader.pages)} páginas")
+            total_pages = len(pdf_reader.pages)
+            
+            for i, page in enumerate(pdf_reader.pages):
+                page_text = page.extract_text()
+                if page_text and page_text.strip():
+                    text_pages.append(page_text.strip())
+                    print(f"📝 Página {i+1}: {len(page_text)} caracteres extraídos (PyPDF2)")
+                else:
+                    print(f"⚠️ Página {i+1}: No se pudo extraer texto")
+
+        print(f"📝 Total páginas con texto: {len(text_pages)} de {total_pages}")
+
+        if len(text_pages) < 1:
+            print("❌ No se pudo extraer texto suficiente del PDF")
+            conciliacion.estado = 'error_extraccion'
+            db.commit()
+            return
+
+        # Configurar DeepSeek
+        print("🤖 Configurando DeepSeek...")
+        conciliacion.estado = 'configurando_deepseek'
+        db.commit()
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            print("❌ DEEPSEEK_API_KEY no encontrada")
+            conciliacion.estado = 'error_config'
+            db.commit()
+            return
+
+        client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+
+        prompt = "Analiza el siguiente extracto bancario y extrae los movimientos financieros relevantes, incluyendo fecha, descripción y valor. Proporciona un resumen estructurado de los movimientos encontrados agrupado por ENTRADAS (debitos) y SALIDAS (creditos)."
+
+        # Procesar con DeepSeek
+        print("🧠 Procesando con DeepSeek...")
+        conciliacion.estado = 'procesando_deepseek'
+        db.commit()
+        max_pages_single = 5
+        pages_per_group = 5
+
+        if len(text_pages) <= max_pages_single:
+            print(f"📄 Procesando PDF pequeño ({len(text_pages)} páginas)")
+            full_text = "\n\n".join(text_pages)
+            result = await process_text_with_deepseek(full_text, prompt, client)
+        else:
+            print(f"📄 Procesando PDF grande ({len(text_pages)} páginas) en lotes")
+            responses = []
+            for i in range(0, len(text_pages), pages_per_group):
+                group_pages = text_pages[i:i + pages_per_group]
+                group_text = "\n\n".join(group_pages)
+                group_number = (i // pages_per_group) + 1
+                total_groups = (len(text_pages) + pages_per_group - 1) // pages_per_group
+                print(f"🔄 Procesando grupo {group_number}/{total_groups}")
+
+                group_prompt = f"{prompt}\n\n--- Grupo {group_number} de {total_groups} ---\nPáginas {i+1}-{min(i+pages_per_group, len(text_pages))} del documento total de {len(text_pages)} páginas."
+                group_result = await process_text_with_deepseek(group_text, group_prompt, client)
+                responses.append(group_result)
+
+            result = combine_deepseek_responses(responses)
+
+        if "error" in result:
+            print(f"❌ Error en DeepSeek: {result['error']}")
+            conciliacion.estado = 'error_deepseek'
+            db.commit()
+            return
+
+        print("✅ Procesamiento con DeepSeek completado")
+
+        # Cargar movimientos en BD (usando lógica de cargar_movimientos_deepseek)
+        print("💾 Cargando movimientos en BD...")
+        conciliacion.estado = 'cargando_movimientos'
+        db.commit()
+        
+        movimientos_data = result
+        if "movimientos" not in movimientos_data:
+            print("❌ JSON inválido: falta campo 'movimientos'")
+            conciliacion.estado = 'error_json'
+            db.commit()
+            return
+
+        movimientos_json = movimientos_data["movimientos"]
+        nuevos_movimientos = []
+        total_entradas = 0
+        total_salidas = 0
+
+        # Procesar entradas
+        if "entradas" in movimientos_json and isinstance(movimientos_json["entradas"], list):
+            for entrada in movimientos_json["entradas"]:
+                if not isinstance(entrada, dict):
+                    continue
+                fecha = entrada.get("fecha", "").strip()
+                descripcion = entrada.get("descripcion", "").strip()
+                valor = entrada.get("valor", 0)
+                if not fecha or not descripcion:
+                    continue
+                try:
+                    if isinstance(valor, str):
+                        valor = float(valor.replace("$", "").replace(",", "").replace(" ", ""))
+                    elif not isinstance(valor, (int, float)):
+                        valor = 0.0
+                except:
+                    valor = 0.0
+
+                movimiento = Movimiento(
+                    id_conciliacion=conciliacion_id,
+                    fecha=fecha,
+                    descripcion=f"[DeepSeek] {descripcion}",
+                    valor=abs(valor),
+                    tipo="banco",
+                    es="E",  # Entradas son E (crédito)
+                    estado_conciliacion="no_conciliado"
+                )
+                nuevos_movimientos.append(movimiento)
+                total_entradas += 1
+
+        # Procesar salidas
+        if "salidas" in movimientos_json and isinstance(movimientos_json["salidas"], list):
+            for salida in movimientos_json["salidas"]:
+                if not isinstance(salida, dict):
+                    continue
+                fecha = salida.get("fecha", "").strip()
+                descripcion = salida.get("descripcion", "").strip()
+                valor = salida.get("valor", 0)
+                if not fecha or not descripcion:
+                    continue
+                try:
+                    if isinstance(valor, str):
+                        valor = float(valor.replace("$", "").replace(",", "").replace(" ", ""))
+                    elif not isinstance(valor, (int, float)):
+                        valor = 0.0
+                except:
+                    valor = 0.0
+
+                movimiento = Movimiento(
+                    id_conciliacion=conciliacion_id,
+                    fecha=fecha,
+                    descripcion=f"[DeepSeek] {descripcion}",
+                    valor=abs(valor),
+                    tipo="banco",
+                    es="S",  # Salidas son S (débito)
+                    estado_conciliacion="no_conciliado"
+                )
+                nuevos_movimientos.append(movimiento)
+                total_salidas += 1
+
+        if not nuevos_movimientos:
+            print("❌ No se encontraron movimientos válidos")
+            conciliacion.estado = 'error_sin_movimientos'
+            db.commit()
+            return
+
+        # Guardar movimientos
+        print(f"💾 Guardando {len(nuevos_movimientos)} movimientos...")
+        db.bulk_save_objects(nuevos_movimientos)
+        conciliacion.estado = 'completado_extracto'
+        db.commit()
+
+        print(f"✅ Procesamiento completado: {total_entradas} entradas, {total_salidas} salidas")
+
+    except Exception as e:
+        print(f"❌ Error en procesamiento en segundo plano: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        try:
+            conciliacion.estado = 'error_procesamiento'
+            db.commit()
+        except:
+            pass
+    finally:
+        db.close()
+
+
+async def process_text_with_deepseek(text: str, prompt: str, client) -> dict:
+    """
+    Procesa texto con DeepSeek API y retorna la respuesta JSON.
+    """
+    try:
+        print(f"📤 Enviando texto a DeepSeek ({len(text)} caracteres)...")
+
+        # Crear el mensaje del sistema con el prompt del usuario
+        system_message = f"""Eres un asistente especializado en análisis de extractos bancarios.
+Tu tarea es analizar el texto proporcionado y extraer información financiera relevante.
+
+Instrucciones específicas del usuario:
+{prompt}
+
+FORMATO DE RESPUESTA OBLIGATORIO:
+Debes responder ÚNICAMENTE con un objeto JSON válido que tenga exactamente esta estructura:
+
+{{
+    "resumen": {{
+        "saldo_inicial": 0.00,
+        "total_abonos": 0.00,
+        "total_cargos": 0.00,
+        "saldo_final": 0.00
+    }},
+    "movimientos": {{
+        "entradas": [
+            {{
+                "fecha": "DD/MM/YYYY",
+                "descripcion": "texto descriptivo",
+                "valor": 0.00
+            }}
+        ],
+        "salidas": [
+            {{
+                "fecha": "DD/MM/YYYY",
+                "descripcion": "texto descriptivo",
+                "valor": 0.00
+            }}
+        ]
+    }}
+}}
+
+REGLAS IMPORTANTES:
+- NO incluyas NINGÚN texto adicional antes o después del JSON
+- NO uses bloques de código markdown ```json
+- NO agregues explicaciones o comentarios
+- El JSON debe ser válido y parseable
+- Si no encuentras información, usa arrays vacíos []
+- Mantén las descripciones concisas pero completas"""
+
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"Analiza este extracto bancario:\n\n{text}"}
+            ],
+            max_tokens=8192,  # Aumentado para reducir truncamiento
+            temperature=0.0  # Temperatura más baja para consistencia
+        )
+
+        content = response.choices[0].message.content.strip()
+        print(f"✅ Respuesta de DeepSeek recibida ({len(content)} caracteres)")
+        print(f"📄 Contenido crudo: {content[:300]}...")
+
+        # Función auxiliar para extraer JSON de la respuesta
+        def extract_json_from_response(response_text: str) -> dict:
+            """
+            Intenta extraer un objeto JSON válido de la respuesta de DeepSeek.
+            Maneja casos donde puede haber texto adicional o formato markdown.
+            """
+            # Primero intentar parsear directamente
+            try:
+                return json.loads(response_text)
+            except json.JSONDecodeError:
+                pass
+
+            # Buscar JSON dentro de bloques de código markdown
+            import re
+
+            # Buscar ```json ... ```
+            json_block = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if json_block:
+                try:
+                    return json.loads(json_block.group(1))
+                except json.JSONDecodeError:
+                    pass
+
+            # Buscar el primer { y el último } que formen un JSON válido
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}')
+
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                potential_json = response_text[start_idx:end_idx + 1]
+                try:
+                    return json.loads(potential_json)
+                except json.JSONDecodeError as e:
+                    # Intentar reparar JSON truncado de manera más inteligente
+                    try:
+                        repaired = potential_json.rstrip()
+
+                        # Si termina con ... o comillas sin cerrar, intentar una reparación básica
+                        if repaired.endswith('...'):
+                            repaired = repaired[:-3]
+                        elif repaired.endswith('"') and repaired.count('"') % 2 == 1:
+                            # Si hay comillas sin cerrar al final, probablemente está truncado
+                            # Buscar la última coma antes de la truncatura y cerrar ahí
+                            last_comma = repaired.rfind(',')
+                            if last_comma > repaired.rfind('{') and last_comma > repaired.rfind('['):
+                                repaired = repaired[:last_comma] + '}'
+                            else:
+                                repaired += '}'
+
+                        # Contar llaves y brackets para cerrar los pendientes
+                        open_braces = repaired.count('{') - repaired.count('}')
+                        open_brackets = repaired.count('[') - repaired.count(']')
+
+                        # Solo cerrar si hay desbalance significativo
+                        if abs(open_braces) <= 2 and abs(open_brackets) <= 2:
+                            repaired += '}' * max(0, open_braces) + ']' * max(0, open_brackets)
+
+                        return json.loads(repaired)
+                    except json.JSONDecodeError:
+                        # Si la reparación falla, intentar extraer información parcial
+                        try:
+                            # Buscar patrones comunes en el texto
+                            resumen_match = re.search(r'"resumen"\s*:\s*\{([^}]+)\}', response_text, re.DOTALL)
+                            movimientos_match = re.search(r'"movimientos"\s*:\s*\{([^}]+)\}', response_text, re.DOTALL)
+
+                            partial_result = {}
+
+                            if resumen_match:
+                                # Intentar parsear el resumen
+                                resumen_text = '{' + resumen_match.group(1) + '}'
+                                try:
+                                    partial_result['resumen'] = json.loads(resumen_text)
+                                except:
+                                    partial_result['resumen'] = {"error": "Resumen parcialmente truncado"}
+
+                            if movimientos_match:
+                                # Intentar parsear movimientos
+                                movimientos_text = '{' + movimientos_match.group(1) + '}'
+                                try:
+                                    partial_result['movimientos'] = json.loads(movimientos_text)
+                                except:
+                                    partial_result['movimientos'] = {"error": "Movimientos parcialmente truncados"}
+
+                            if partial_result:
+                                partial_result['warning'] = 'JSON truncado - información parcial extraída'
+                                return partial_result
+
+                        except:
+                            pass
+
+            # Último intento: limpiar texto y buscar JSON
+            # Remover líneas que no parecen JSON
+            lines = response_text.split('\n')
+            json_lines = []
+            in_json = False
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith('{'):
+                    in_json = True
+                    json_lines.append(line)
+                elif in_json:
+                    json_lines.append(line)
+                    if line.endswith('}'):
+                        break
+
+            if json_lines:
+                potential_json = '\n'.join(json_lines)
+                try:
+                    return json.loads(potential_json)
+                except json.JSONDecodeError:
+                    pass
+
+            # Si nada funciona, retornar el error
+            raise json.JSONDecodeError("No se pudo extraer JSON válido", response_text, 0)
+
+        # Intentar extraer JSON de la respuesta
+        try:
+            result = extract_json_from_response(content)
+            print("✅ JSON parseado exitosamente")
+            return result
+        except json.JSONDecodeError as e:
+            print(f"❌ Error parseando JSON: {e}")
+            print(f"Contenido recibido: {content[:1000]}...")
+
+            # Intentar una segunda llamada con instrucciones más estrictas
+            print("🔄 Intentando segunda llamada con instrucciones más estrictas...")
+            try:
+                strict_system_message = """Analiza el extracto bancario y responde ÚNICAMENTE con JSON válido.
+Ejemplo de formato esperado:
+{
+    "resumen": {
+        "saldo_inicial": 0.00,
+        "total_abonos": 0.00,
+        "total_cargos": 0.00,
+        "saldo_final": 0.00
+    },
+    "movimientos": {
+        "entradas": [
+            {"fecha": "DD/MM/YYYY", "descripcion": "texto", "valor": 0.00}
+        ],
+        "salidas": [
+            {"fecha": "DD/MM/YYYY", "descripcion": "texto", "valor": 0.00}
+        ]
+    }
+}
+NO agregues texto adicional."""
+
+                response2 = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[
+                        {"role": "system", "content": strict_system_message},
+                        {"role": "user", "content": f"Analiza este extracto bancario y devuelve solo JSON:\n\n{text}"}
+                    ],
+                    max_tokens=8192,  # Aumentado para reducir truncamiento
+                    temperature=0.0  # Temperatura más baja para más consistencia
+                )
+
+                content2 = response2.choices[0].message.content.strip()
+                print(f"📄 Segunda respuesta: {content2[:300]}...")
+
+                result = extract_json_from_response(content2)
+                print("✅ JSON parseado exitosamente en segunda llamada")
+                return result
+
+            except Exception as retry_error:
+                print(f"❌ Error también en segunda llamada: {str(retry_error)}")
+                return {
+                    "error": "Respuesta no es JSON válido después de reintento",
+                    "raw_content": content,
+                    "second_attempt_content": content2 if 'content2' in locals() else None,
+                    "parse_error": str(e),
+                    "retry_error": str(retry_error)
+                }
+
+    except Exception as e:
+        print(f"❌ Error en process_text_with_deepseek: {str(e)}")
+        return {
+            "error": f"Error procesando con DeepSeek: {str(e)}",
+            "text_length": len(text)
+        }
+
+
+def combine_deepseek_responses(responses: list) -> dict:
+    """
+    Combina múltiples respuestas JSON de DeepSeek en una sola respuesta consolidada.
+    """
+    try:
+        print(f"🔄 Combinando {len(responses)} respuestas de DeepSeek...")
+
+        # Filtrar respuestas válidas (sin errores)
+        valid_responses = [r for r in responses if "error" not in r]
+
+        if not valid_responses:
+            return {
+                "error": "Todas las respuestas contienen errores",
+                "responses": responses
+            }
+
+        # Si solo hay una respuesta, retornarla directamente
+        if len(valid_responses) == 1:
+            return valid_responses[0]
+
+        # Combinar respuestas múltiples
+        combined = {
+            "total_pages_processed": len(responses),
+            "valid_responses": len(valid_responses),
+            "combined_data": {}
+        }
+
+        # Extraer y combinar datos comunes
+        all_movimientos = []
+        all_resumenes = []
+        all_alertas = []
+
+        for response in valid_responses:
+            # Combinar movimientos si existen
+            if "movimientos" in response and isinstance(response["movimientos"], list):
+                all_movimientos.extend(response["movimientos"])
+
+            # Combinar resúmenes
+            if "resumen" in response:
+                all_resumenes.append(response["resumen"])
+
+            # Combinar alertas
+            if "alertas" in response and isinstance(response["alertas"], list):
+                all_alertas.extend(response["alertas"])
+
+            # Copiar otros campos únicos
+            for key, value in response.items():
+                if key not in ["movimientos", "resumen", "alertas", "error"]:
+                    if key not in combined["combined_data"]:
+                        combined["combined_data"][key] = value
+                    elif isinstance(combined["combined_data"][key], list) and isinstance(value, list):
+                        combined["combined_data"][key].extend(value)
+                    elif isinstance(combined["combined_data"][key], dict) and isinstance(value, dict):
+                        combined["combined_data"][key].update(value)
+
+        # Agregar secciones combinadas
+        if all_movimientos:
+            combined["movimientos"] = all_movimientos
+
+        if all_resumenes:
+            combined["resumenes_por_grupo"] = all_resumenes
+            # Crear un resumen general
+            combined["resumen_general"] = {
+                "total_movimientos": len(all_movimientos),
+                "grupos_procesados": len(valid_responses),
+                "periodo_cubierto": "Múltiples grupos de páginas"
+            }
+
+        if all_alertas:
+            combined["alertas"] = all_alertas
+
+        print(f"✅ Respuestas combinadas exitosamente")
+        return combined
+
+    except Exception as e:
+        print(f"❌ Error combinando respuestas: {str(e)}")
+        return {
+            "error": f"Error combinando respuestas: {str(e)}",
+            "responses": responses
+        }
+
+
+@router.post("/cargar-movimientos-deepseek/{conciliacion_id}")
+async def cargar_movimientos_deepseek(
+    conciliacion_id: int,
+    movimientos_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Carga movimientos extraídos por DeepSeek a la base de datos.
+    Convierte el JSON estructurado en registros de Movimiento.
+    """
+    try:
+        print(f"🔄 Iniciando carga de movimientos DeepSeek para conciliación #{conciliacion_id}")
+
+        # Verificar que la conciliación existe y pertenece al usuario
+        conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+        if not conciliacion:
+            print(f"❌ Error: Conciliación #{conciliacion_id} no encontrada")
+            raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+        # Verificar acceso según rol del usuario
+        if current_user.role != 'administrador' and conciliacion.id_usuario_creador != current_user.id:
+            print(f"❌ Error: Usuario {current_user.id} no tiene acceso a conciliación #{conciliacion_id}")
+            raise HTTPException(status_code=403, detail="No tienes permiso para acceder a esta conciliación")
+
+        print(f"✅ Conciliación #{conciliacion_id} validada para usuario {current_user.username}")
+
+        # Validar estructura del JSON
+        if not movimientos_data or "movimientos" not in movimientos_data:
+            raise HTTPException(status_code=400, detail="JSON inválido: falta campo 'movimientos'")
+
+        movimientos_json = movimientos_data["movimientos"]
+        if not isinstance(movimientos_json, dict):
+            raise HTTPException(status_code=400, detail="Campo 'movimientos' debe ser un objeto")
+
+        nuevos_movimientos = []
+        total_entradas = 0
+        total_salidas = 0
+
+        # Procesar entradas (créditos)
+        if "entradas" in movimientos_json and isinstance(movimientos_json["entradas"], list):
+            for entrada in movimientos_json["entradas"]:
+                if not isinstance(entrada, dict):
+                    continue
+
+                # Validar campos requeridos
+                fecha = entrada.get("fecha", "").strip()
+                descripcion = entrada.get("descripcion", "").strip()
+                valor = entrada.get("valor", 0)
+
+                if not fecha or not descripcion:
+                    print(f"⚠️ Entrada inválida omitida: fecha='{fecha}', desc='{descripcion[:50]}...'")
+                    continue
+
+                # Convertir valor a float si es string
+                try:
+                    if isinstance(valor, str):
+                        # Remover símbolos de moneda y espacios
+                        valor = float(valor.replace("$", "").replace(",", "").replace(" ", ""))
+                    elif not isinstance(valor, (int, float)):
+                        valor = 0.0
+                except (ValueError, TypeError):
+                    print(f"⚠️ Valor inválido en entrada: {valor}, usando 0.0")
+                    valor = 0.0
+
+                movimiento = Movimiento(
+                    id_conciliacion=conciliacion_id,
+                    fecha=fecha,
+                    descripcion=f"[DeepSeek] {descripcion}",
+                    valor=abs(valor),  # Siempre positivo
+                    tipo="banco",
+                    es="E",  # Entradas son E (crédito)
+                    estado_conciliacion="no_conciliado"
+                )
+                nuevos_movimientos.append(movimiento)
+                total_entradas += 1
+                print(f"✅ Entrada procesada: {fecha} - {descripcion[:50]}... - ${valor}")
+
+        # Procesar salidas (débitos)
+        if "salidas" in movimientos_json and isinstance(movimientos_json["salidas"], list):
+            for salida in movimientos_json["salidas"]:
+                if not isinstance(salida, dict):
+                    continue
+
+                # Validar campos requeridos
+                fecha = salida.get("fecha", "").strip()
+                descripcion = salida.get("descripcion", "").strip()
+                valor = salida.get("valor", 0)
+
+                if not fecha or not descripcion:
+                    print(f"⚠️ Salida inválida omitida: fecha='{fecha}', desc='{descripcion[:50]}...'")
+                    continue
+
+                # Convertir valor a float si es string
+                try:
+                    if isinstance(valor, str):
+                        # Remover símbolos de moneda y espacios
+                        valor = float(valor.replace("$", "").replace(",", "").replace(" ", ""))
+                    elif not isinstance(valor, (int, float)):
+                        valor = 0.0
+                except (ValueError, TypeError):
+                    print(f"⚠️ Valor inválido en salida: {valor}, usando 0.0")
+                    valor = 0.0
+
+                movimiento = Movimiento(
+                    id_conciliacion=conciliacion_id,
+                    fecha=fecha,
+                    descripcion=f"[DeepSeek] {descripcion}",
+                    valor=abs(valor),  # Siempre positivo
+                    tipo="banco",
+                    es="S",  # Salidas son S (débito)
+                    estado_conciliacion="no_conciliado"
+                )
+                nuevos_movimientos.append(movimiento)
+                total_salidas += 1
+                print(f"✅ Salida procesada: {fecha} - {descripcion[:50]}... - ${valor}")
+
+        if not nuevos_movimientos:
+            raise HTTPException(status_code=400, detail="No se encontraron movimientos válidos para cargar")
+
+        # Guardar movimientos en la base de datos
+        print(f"💾 Guardando {len(nuevos_movimientos)} movimientos en la base de datos...")
+        db.bulk_save_objects(nuevos_movimientos)
+        db.commit()
+
+        print(f"✅ Carga completada exitosamente: {total_entradas} entradas, {total_salidas} salidas")
+
+        return JSONResponse(content={
+            "message": f"Movimientos cargados exitosamente a la conciliación #{conciliacion_id}",
+            "movimientos_cargados": len(nuevos_movimientos),
+            "entradas": total_entradas,
+            "salidas": total_salidas,
+            "detalles": {
+                "total_entradas": total_entradas,
+                "total_salidas": total_salidas,
+                "conciliacion_id": conciliacion_id
+            }
+        })
+
+    except HTTPException:
+        # Re-lanzar excepciones HTTP sin modificar
+        raise
+    except Exception as e:
+        print(f"❌ Error inesperado en cargar_movimientos_deepseek: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()  # Revertir cambios en caso de error
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")

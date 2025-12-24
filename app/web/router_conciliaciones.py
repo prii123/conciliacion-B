@@ -60,6 +60,22 @@ def agregar_movimientos(request: Request, conciliacion_id: int, db: Session = De
     })
 
 
+@router.get("/upload-extracto/{conciliacion_id}", name="upload_extracto")
+def upload_extracto(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
+    factory = RepositoryFactory(db)
+    conciliacion_repo = factory.get_conciliacion_repository()
+
+    conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    return templates.TemplateResponse("upload_extracto.html", {
+        "request": request,
+        "conciliacion_id": conciliacion_id,
+        "conciliacion": conciliacion
+    })
+
+
 @router.get('/descargar_plantilla')
 def descargar_plantilla():
     """Devuelve el archivo plantilla_movimientos.xlsx ubicado en la raíz del proyecto."""
@@ -69,3 +85,18 @@ def descargar_plantilla():
     if not candidate.exists():
         raise HTTPException(status_code=404, detail='Plantilla no encontrada')
     return FileResponse(str(candidate), media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename='plantilla_movimientos.xlsx')
+
+@router.get("/upload-extracto/{conciliacion_id}", name="upload_extracto")
+def upload_extracto(request: Request, conciliacion_id: int, db: Session = Depends(get_db)):
+    factory = RepositoryFactory(db)
+    conciliacion_repo = factory.get_conciliacion_repository()
+
+    conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    return templates.TemplateResponse("upload_extracto.html", {
+        "request": request,
+        "conciliacion_id": conciliacion_id,
+        "conciliacion": conciliacion
+    })

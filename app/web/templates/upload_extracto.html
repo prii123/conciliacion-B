@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Subir Extracto Bancario{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Subir Extracto Bancario (PDF) - Conciliación #{{ conciliacion_id }}</h3>
+                    <p class="mb-0 text-muted">Cuenta: {{ conciliacion.cuenta_conciliada }} | Mes: {{ conciliacion.mes_conciliado }} {{ conciliacion.año_conciliado }}</p>
+                    {% if conciliacion.estado == 'procesando_extracto' %}
+                    <div class="alert alert-warning mt-2">
+                        <i class="bi bi-hourglass-split me-2"></i>
+                        <strong>Procesamiento en curso:</strong> El extracto está siendo analizado con DeepSeek. Puede tardar varios minutos.
+                    </div>
+                    {% elif conciliacion.estado == 'completado_extracto' %}
+                    <div class="alert alert-success mt-2">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong>Procesamiento completado:</strong> Los movimientos han sido cargados exitosamente.
+                    </div>
+                    {% elif conciliacion.estado.startswith('error') %}
+                    <div class="alert alert-danger mt-2">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Error en procesamiento:</strong> {{ conciliacion.estado.replace('_', ' ').title() }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if conciliacion.estado == 'procesando_extracto' or conciliacion.estado == 'extrayendo_texto' or conciliacion.estado == 'configurando_deepseek' or conciliacion.estado == 'procesando_deepseek' or conciliacion.estado == 'cargando_movimientos' %}
+                    {% if conciliacion.estado == 'extrayendo_texto' %}
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-file-earmark-text me-2"></i>Extrayendo Texto del PDF</h5>
+                        <p>Analizando el contenido del archivo PDF...</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 25%"></div>
+                        </div>
+                    </div>
+                    {% elif conciliacion.estado == 'configurando_deepseek' %}
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-robot me-2"></i>Configurando IA</h5>
+                        <p>Preparando conexión con DeepSeek AI...</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 50%"></div>
+                        </div>
+                    </div>
+                    {% elif conciliacion.estado == 'procesando_deepseek' %}
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-brain me-2"></i>Procesando con IA</h5>
+                        <p>DeepSeek está analizando el extracto bancario...</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 75%"></div>
+                        </div>
+                    </div>
+                    {% elif conciliacion.estado == 'cargando_movimientos' %}
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-upload me-2"></i>Cargando Movimientos</h5>
+                        <p>Guardando los movimientos extraídos en la base de datos...</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 90%"></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle me-2"></i>Procesamiento en Progreso</h5>
+                        <p>El extracto bancario está siendo procesado en segundo plano. Por favor, espera a que se complete.</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <small class="text-muted">Actualizando estado automáticamente...</small>
+                    <button type="button" class="btn btn-secondary ms-2" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Manualmente
+                    </button>
+                    <script>
+                        // Polling para actualizar el estado cada 10 segundos
+                        setInterval(async function() {
+                            try {
+                                const response = await fetch(window.location.href, {
+                                    headers: { 'Authorization': 'Bearer ' + Auth.getToken() }
+                                });
+                                if (response.ok) {
+                                    const html = await response.text();
+                                    // Si el estado cambió, recargar la página
+                                    if (!html.includes('procesando_extracto') && !html.includes('extrayendo_texto') && !html.includes('configurando_deepseek') && !html.includes('procesando_deepseek') && !html.includes('cargando_movimientos')) {
+                                        location.reload();
+                                    }
+                                }
+                            } catch (error) {
+                                console.log('Error en polling:', error);
+                            }
+                        }, 10000); // Cada 10 segundos
+                    </script>
+                    {% elif conciliacion.estado == 'completado_extracto' %}
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle me-2"></i>Extracto Procesado</h5>
+                        <p>Los movimientos del extracto han sido cargados exitosamente en la conciliación.</p>
+                        <a href="/conciliaciones/detalle/{{ conciliacion_id }}" class="btn btn-primary">
+                            <i class="bi bi-eye me-2"></i>Ver Conciliación
+                        </a>
+                    </div>
+                    {% else %}
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <input type="hidden" name="conciliacion_id" value="{{ conciliacion_id }}">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Archivo PDF del Extracto Bancario</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
+                            <div class="form-text">El procesamiento puede tardar varios minutos dependiendo del tamaño del PDF.</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                            Procesar Extracto
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mt-4 d-none" id="resultCard">
+                <div class="card-header">
+                    <h5 class="card-title">Resultado del Análisis</h5>
+                </div>
+                <div class="card-body">
+                    <div id="resultContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Función auxiliar para contar movimientos en el resultado
+function getMovementsCount(resultado) {
+    if (!resultado || !resultado.movimientos) return 0;
+    
+    let count = 0;
+    if (resultado.movimientos.entradas && Array.isArray(resultado.movimientos.entradas)) {
+        count += resultado.movimientos.entradas.length;
+    }
+    if (resultado.movimientos.salidas && Array.isArray(resultado.movimientos.salidas)) {
+        count += resultado.movimientos.salidas.length;
+    }
+    return count;
+}
+
+// Función para mostrar/ocultar el resultado completo
+function toggleResultado() {
+    const resultadoDiv = document.getElementById('resultadoCompleto');
+    if (resultadoDiv.style.display === 'none') {
+        resultadoDiv.style.display = 'block';
+    } else {
+        resultadoDiv.style.display = 'none';
+    }
+}
+
+// Función para cargar movimientos a la base de datos
+async function cargarMovimientosABaseDatos() {
+    if (!window.deepseekResult) {
+        alert('No hay resultado de DeepSeek para cargar');
+        return;
+    }
+    
+    const conciliacionId = document.querySelector('input[name="conciliacion_id"]').value;
+    const btn = document.getElementById('cargarMovimientosBtn');
+    const originalText = btn.innerHTML;
+    
+    // Cambiar texto del botón
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Cargando...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch(`/api/conciliaciones/cargar-movimientos-deepseek/${conciliacionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + Auth.getToken()
+            },
+            body: JSON.stringify(window.deepseekResult)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Actualizar la interfaz
+            const resultContent = document.getElementById('resultContent');
+            resultContent.innerHTML += `
+                <div class="alert alert-success mt-3">
+                    <i class="bi bi-check-circle me-2"></i>${data.message}<br>
+                    <small>Entradas: ${data.entradas} | Salidas: ${data.salidas} | Total: ${data.movimientos_cargados}</small>
+                </div>
+                <div class="mt-3">
+                    <a href="/conciliaciones/detalle/${conciliacionId}" class="btn btn-primary">
+                        <i class="bi bi-arrow-left me-2"></i>Volver a la Conciliación
+                    </a>
+                </div>
+            `;
+            
+            // Deshabilitar el botón de cargar
+            btn.style.display = 'none';
+        } else {
+            alert(`Error al cargar movimientos: ${data.detail || 'Error desconocido'}`);
+        }
+        
+    } catch (error) {
+        alert(`Error de conexión: ${error.message}`);
+    } finally {
+        // Restaurar botón
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner = submitBtn.querySelector('.spinner-border');
+    const resultCard = document.getElementById('resultCard');
+    const resultContent = document.getElementById('resultContent');
+    
+    // Mostrar spinner
+    submitBtn.disabled = true;
+    spinner.classList.remove('d-none');
+    
+    const formData = new FormData(this);
+    const conciliacionId = formData.get('conciliacion_id');
+    
+    try {
+        const response = await fetch(`/api/conciliaciones/upload-extracto/${conciliacionId}`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Authorization': 'Bearer ' + Auth.getToken() // Usando el módulo Auth
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Mostrar mensaje de procesamiento iniciado
+            resultContent.innerHTML = `
+                <div class="alert alert-success">
+                    <h5><i class="bi bi-check-circle me-2"></i>Procesamiento Iniciado</h5>
+                    <p>${data.message}</p>
+                    <div class="alert alert-info">
+                        <strong>¿Qué sucede ahora?</strong><br>
+                        <small>El sistema está procesando el PDF con DeepSeek AI y cargando los movimientos automáticamente. 
+                        Este proceso puede tardar varios minutos dependiendo del tamaño del documento.</small>
+                    </div>
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-primary" onclick="location.reload()">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Página
+                        </button>
+                        <a href="/conciliaciones/detalle/${conciliacionId}" class="btn btn-secondary ms-2">
+                            <i class="bi bi-arrow-left me-2"></i>Volver a la Conciliación
+                        </a>
+                    </div>
+                </div>
+            `;
+            resultCard.classList.remove('d-none');
+            
+            // Deshabilitar el formulario
+            document.getElementById('uploadForm').querySelectorAll('input, button').forEach(el => el.disabled = true);
+        } else {
+            resultContent.innerHTML = `<div class="alert alert-danger">${data.detail || 'Error al iniciar el procesamiento'}</div>`;
+            resultCard.classList.remove('d-none');
+        }
+        
+    } catch (error) {
+        resultContent.innerHTML = `<div class="alert alert-danger">Error de conexión: ${error.message}</div>`;
+        resultCard.classList.remove('d-none');
+    } finally {
+        // Ocultar spinner
+        submitBtn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+</script>
+{% endblock %}

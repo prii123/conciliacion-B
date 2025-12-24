@@ -109,6 +109,7 @@
             const estadisticasNavItem = document.getElementById('estadisticasNavItem');
             const conciliacionesNavItem = document.getElementById('conciliacionesNavItem');
             const empresasNavItem = document.getElementById('empresasNavItem');
+            const uploadExtractoNavItem = document.getElementById('uploadExtractoNavItem');
             const plantillaNavItem = document.getElementById('plantillaNavItem');
             
             // console.log('Verificando autenticación...');
@@ -123,6 +124,7 @@
                 // Mostrar menús de usuario autenticado
                 if (conciliacionesNavItem) conciliacionesNavItem.classList.remove('d-none');
                 if (empresasNavItem) empresasNavItem.classList.remove('d-none');
+                if (uploadExtractoNavItem) uploadExtractoNavItem.classList.remove('d-none');
                 if (plantillaNavItem) plantillaNavItem.classList.remove('d-none');
                 
                 // Verificar si es administrador para mostrar menús de admin
@@ -153,6 +155,7 @@
                 // Ocultar todos los menús de usuario
                 if (conciliacionesNavItem) conciliacionesNavItem.classList.add('d-none');
                 if (empresasNavItem) empresasNavItem.classList.add('d-none');
+                if (uploadExtractoNavItem) uploadExtractoNavItem.classList.add('d-none');
                 if (usuariosNavItem) usuariosNavItem.classList.add('d-none');
                 if (estadisticasNavItem) estadisticasNavItem.classList.add('d-none');
                 if (plantillaNavItem) plantillaNavItem.classList.add('d-none');
