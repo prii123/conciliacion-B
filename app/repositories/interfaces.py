@@ -244,3 +244,81 @@ class IConciliacionManualRepository(ABC):
     def create_auxiliar_item(self, item_data: Dict[str, Any]):
         """Crea un item auxiliar para conciliación manual"""
         pass
+
+
+class ITaskRepository(ABC):
+    """Repositorio para gestión de tareas del sistema"""
+    
+    @abstractmethod
+    def get_by_id(self, task_id: int):
+        """Obtiene una tarea por ID"""
+        pass
+    
+    @abstractmethod
+    def get_by_conciliacion(self, conciliacion_id: int) -> List:
+        """Obtiene todas las tareas de una conciliación"""
+        pass
+    
+    @abstractmethod
+    def get_pending(self) -> List:
+        """Obtiene todas las tareas pendientes"""
+        pass
+    
+    @abstractmethod
+    def get_by_user(self, user_id: int) -> List:
+        """Obtiene tareas de conciliaciones del usuario"""
+        pass
+    
+    @abstractmethod
+    def create(self, task_data: Dict[str, Any]):
+        """Crea una nueva tarea"""
+        pass
+    
+    @abstractmethod
+    def update(self, task_id: int, task_data: Dict[str, Any]):
+        """Actualiza una tarea"""
+        pass
+    
+    @abstractmethod
+    def delete(self, task_id: int):
+        """Elimina una tarea"""
+        pass
+    
+    @abstractmethod
+    def count_pending(self) -> int:
+        """Cuenta tareas pendientes"""
+        pass
+
+
+class IDeepSeekProcessingResultRepository(ABC):
+    """Repositorio para gestión de resultados parciales de procesamiento DeepSeek"""
+    
+    @abstractmethod
+    def get_by_task(self, task_id: int) -> List:
+        """Obtiene todos los resultados de una tarea"""
+        pass
+    
+    @abstractmethod
+    def get_by_task_and_group(self, task_id: int, group_number: int):
+        """Obtiene resultado específico de grupo"""
+        pass
+    
+    @abstractmethod
+    def create(self, result_data: Dict[str, Any]):
+        """Crea un nuevo resultado de procesamiento"""
+        pass
+    
+    @abstractmethod
+    def update(self, result_id: int, result_data: Dict[str, Any]):
+        """Actualiza un resultado de procesamiento"""
+        pass
+    
+    @abstractmethod
+    def get_successful_results(self, task_id: int) -> List:
+        """Obtiene resultados exitosos de una tarea para recuperación"""
+        pass
+    
+    @abstractmethod
+    def delete_by_task(self, task_id: int):
+        """Elimina todos los resultados de una tarea"""
+        pass

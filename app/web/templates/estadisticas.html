@@ -188,6 +188,147 @@
         transform: translateY(-8px);
         box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
     }
+    
+    /* Estilos para tareas activas */
+    .task-item {
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        border-left: 4px solid;
+        transition: all 0.3s ease;
+    }
+    
+    .task-item:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .task-item.pending {
+        border-left-color: #ffc107;
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    }
+    
+    .task-item.processing {
+        border-left-color: #0dcaf0;
+        background: linear-gradient(135deg, #cff4fc 0%, #b6effb 100%);
+    }
+    
+    .task-item.completed {
+        border-left-color: #198754;
+        background: linear-gradient(135deg, #d1edff 0%, #bee5eb 100%);
+    }
+    
+    .task-item.failed {
+        border-left-color: #dc3545;
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c2c7 100%);
+    }
+    
+    .task-title {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .task-description {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+    
+    .task-progress {
+        width: 100%;
+        height: 8px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+    
+    .task-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #0dcaf0 0%, #198754 100%);
+        transition: width 0.3s ease;
+    }
+    
+    /* Estilos para tareas fallidas */
+    .failed-task-item {
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        border-left: 4px solid #dc3545;
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c2c7 100%);
+        transition: all 0.3s ease;
+    }
+    
+    .failed-task-item:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .failed-task-title {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #721c24;
+    }
+    
+    .failed-task-description {
+        font-size: 0.9rem;
+        color: #721c24;
+        margin-bottom: 0.5rem;
+    }
+    
+    .failed-task-info {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+    
+    .retry-btn {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        border: none;
+        color: white;
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        transition: all 0.3s ease;
+    }
+    
+    .retry-btn:hover {
+        background: linear-gradient(135deg, #c82333 0%, #a02622 100%);
+        transform: scale(1.05);
+    }
+    
+    .retry-btn:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+    }
+    
+    .task-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .task-status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .no-tasks {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+    
+    .no-tasks i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
+    }
 </style>
 {% endblock %}
 
@@ -212,6 +353,44 @@
         <div class="col-12 text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tareas Activas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card" style="border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                <div class="card-header bg-info text-white" style="border-radius: 12px 12px 0 0;">
+                    <h5 class="mb-0"><i class="bi bi-gear-fill me-2"></i>Tareas Activas del Sistema</h5>
+                </div>
+                <div class="card-body" id="tareasContainer">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Cargando tareas...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Verificando tareas activas...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tareas Fallidas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card" style="border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                <div class="card-header bg-danger text-white" style="border-radius: 12px 12px 0 0;">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Tareas Fallidas - Recuperación</h5>
+                </div>
+                <div class="card-body" id="tareasFallidasContainer">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-danger" role="status">
+                            <span class="visually-hidden">Cargando tareas fallidas...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Verificando tareas fallidas...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

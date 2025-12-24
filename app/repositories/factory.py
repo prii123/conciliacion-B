@@ -7,7 +7,7 @@ from typing import Literal
 
 from .interfaces import (
     IUserRepository, IEmpresaRepository, IConciliacionRepository,
-    IMovimientoRepository, IConciliacionMatchRepository, IConciliacionManualRepository
+    IMovimientoRepository, IConciliacionMatchRepository, IConciliacionManualRepository, ITaskRepository, IDeepSeekProcessingResultRepository
 )
 from .sqlalchemy_impl import (
     SQLAlchemyUserRepository,
@@ -15,7 +15,9 @@ from .sqlalchemy_impl import (
     SQLAlchemyConciliacionRepository,
     SQLAlchemyMovimientoRepository,
     SQLAlchemyConciliacionMatchRepository,
-    SQLAlchemyConciliacionManualRepository
+    SQLAlchemyConciliacionManualRepository,
+    SQLAlchemyTaskRepository,
+    SQLAlchemyDeepSeekProcessingResultRepository
 )
 
 
@@ -74,6 +76,18 @@ class RepositoryFactory:
         if self.implementation == 'sqlalchemy':
             return SQLAlchemyConciliacionManualRepository(self.db)
         raise ValueError(f"Implementación desconocida: {self.implementation}")
+    
+    def get_task_repository(self) -> ITaskRepository:
+        """Obtiene repositorio de tareas"""
+        if self.implementation == 'sqlalchemy':
+            return SQLAlchemyTaskRepository(self.db)
+        raise ValueError(f"Implementación desconocida: {self.implementation}")
+    
+    def get_deepseek_result_repository(self) -> IDeepSeekProcessingResultRepository:
+        """Obtiene repositorio de resultados de procesamiento DeepSeek"""
+        if self.implementation == 'sqlalchemy':
+            return SQLAlchemyDeepSeekProcessingResultRepository(self.db)
+        raise ValueError(f"Implementación desconocida: {self.implementation}")
 
 
 # Helper function para obtener todos los repositorios de una vez
@@ -83,7 +97,7 @@ def get_repositories(db: Session):
     Útil para dependency injection en FastAPI.
     
     Returns:
-        tuple: (user_repo, empresa_repo, conciliacion_repo, movimiento_repo, match_repo, manual_repo)
+        tuple: (user_repo, empresa_repo, conciliacion_repo, movimiento_repo, match_repo, manual_repo, task_repo, deepseek_result_repo)
     """
     factory = RepositoryFactory(db)
     return (
@@ -92,5 +106,7 @@ def get_repositories(db: Session):
         factory.get_conciliacion_repository(),
         factory.get_movimiento_repository(),
         factory.get_match_repository(),
-        factory.get_manual_repository()
+        factory.get_manual_repository(),
+        factory.get_task_repository(),
+        factory.get_deepseek_result_repository()
     )

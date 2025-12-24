@@ -10,11 +10,11 @@ from datetime import datetime
 from ..models import (
     User, Empresa, Conciliacion, Movimiento, 
     ConciliacionMatch, ConciliacionManual,
-    ConciliacionManualBanco, ConciliacionManualAuxiliar
+    ConciliacionManualBanco, ConciliacionManualAuxiliar, Task, DeepSeekProcessingResult
 )
 from .interfaces import (
     IUserRepository, IEmpresaRepository, IConciliacionRepository,
-    IMovimientoRepository, IConciliacionMatchRepository, IConciliacionManualRepository
+    IMovimientoRepository, IConciliacionMatchRepository, IConciliacionManualRepository, ITaskRepository, IDeepSeekProcessingResultRepository
 )
 
 
@@ -332,3 +332,96 @@ class SQLAlchemyConciliacionManualRepository(IConciliacionManualRepository):
         self.db.commit()
         self.db.refresh(item)
         return item
+
+
+class SQLAlchemyTaskRepository(ITaskRepository):
+    """Implementación de TaskRepository con SQLAlchemy"""
+    
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def get_by_id(self, task_id: int):
+        return self.db.query(Task).filter(Task.id == task_id).first()
+    
+    def get_by_conciliacion(self, conciliacion_id: int) -> List:
+        return self.db.query(Task).filter(Task.id_conciliacion == conciliacion_id).order_by(desc(Task.created_at)).all()
+    
+    def get_pending(self) -> List:
+        return self.db.query(Task).filter(Task.estado.in_(['pending', 'processing'])).order_by(desc(Task.created_at)).all()
+    
+    def get_by_user(self, user_id: int) -> List:
+        from ..models import Conciliacion
+        return self.db.query(Task).join(Conciliacion).filter(Conciliacion.id_usuario_creador == user_id).order_by(desc(Task.created_at)).all()
+    
+    def create(self, task_data: Dict[str, Any]):
+        task = Task(**task_data)
+        self.db.add(task)
+        self.db.commit()
+        self.db.refresh(task)
+        return task
+    
+    def update(self, task_id: int, task_data: Dict[str, Any]):
+        task = self.get_by_id(task_id)
+        if task:
+            for key, value in task_data.items():
+                setattr(task, key, value)
+            task.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.db.commit()
+            self.db.refresh(task)
+        return task
+    
+    def delete(self, task_id: int):
+        task = self.get_by_id(task_id)
+        if task:
+            self.db.delete(task)
+            self.db.commit()
+            return True
+        return False
+    
+    def count_pending(self) -> int:
+        return self.db.query(Task).filter(Task.estado.in_(['pending', 'processing'])).count()
+
+
+class SQLAlchemyDeepSeekProcessingResultRepository(IDeepSeekProcessingResultRepository):
+    """Implementación de DeepSeekProcessingResultRepository con SQLAlchemy"""
+    
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def get_by_task(self, task_id: int) -> List:
+        return self.db.query(DeepSeekProcessingResult).filter(DeepSeekProcessingResult.id_task == task_id).order_by(DeepSeekProcessingResult.group_number).all()
+    
+    def get_by_task_and_group(self, task_id: int, group_number: int):
+        return self.db.query(DeepSeekProcessingResult).filter(
+            DeepSeekProcessingResult.id_task == task_id,
+            DeepSeekProcessingResult.group_number == group_number
+        ).first()
+    
+    def create(self, result_data: Dict[str, Any]):
+        result = DeepSeekProcessingResult(**result_data)
+        self.db.add(result)
+        self.db.commit()
+        self.db.refresh(result)
+        return result
+    
+    def update(self, result_id: int, result_data: Dict[str, Any]):
+        result = self.db.query(DeepSeekProcessingResult).filter(DeepSeekProcessingResult.id == result_id).first()
+        if result:
+            for key, value in result_data.items():
+                setattr(result, key, value)
+            result.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.db.commit()
+            self.db.refresh(result)
+        return result
+    
+    def get_successful_results(self, task_id: int) -> List:
+        return self.db.query(DeepSeekProcessingResult).filter(
+            DeepSeekProcessingResult.id_task == task_id,
+            DeepSeekProcessingResult.status == 'saved'
+        ).order_by(DeepSeekProcessingResult.group_number).all()
+    
+    def delete_by_task(self, task_id: int):
+        results = self.db.query(DeepSeekProcessingResult).filter(DeepSeekProcessingResult.id_task == task_id).all()
+        for result in results:
+            self.db.delete(result)
+        self.db.commit()

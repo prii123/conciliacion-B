@@ -121,3 +121,48 @@ class ConciliacionManualAuxiliar(Base):
     id = Column(Integer, primary_key=True)
     id_conciliacion_manual = Column(Integer, ForeignKey('conciliaciones_manuales.id'), nullable=False)
     id_movimiento_auxiliar = Column(Integer, ForeignKey('movimientos.id'), nullable=False)
+
+
+class DeepSeekProcessingResult(Base):
+    """
+    Modelo para guardar resultados parciales del procesamiento de DeepSeek.
+    Permite recuperación en caso de fallos durante procesamiento de PDFs grandes.
+    """
+    __tablename__ = 'deepseek_processing_results'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    id_task = Column(Integer, ForeignKey('tasks.id'), nullable=False)
+    group_number = Column(Integer, nullable=False)  # Número del grupo de páginas procesado
+    total_groups = Column(Integer, nullable=False)  # Total de grupos
+    pages_range = Column(String, nullable=False)  # Rango de páginas procesadas (ej: "1-5")
+    raw_response = Column(Text)  # Respuesta cruda de DeepSeek
+    parsed_json = Column(Text)  # JSON parseado y validado
+    status = Column(String, default='pending')  # 'pending', 'processed', 'failed', 'saved'
+    error_message = Column(Text)  # Mensaje de error si falló
+    created_at = Column(String, default=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    updated_at = Column(String, default=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    # Relación con task
+    task = relationship("Task")
+
+
+class Task(Base):
+    """
+    Modelo para almacenar tareas pendientes del sistema, como procesamiento de DeepSeek
+    """
+    __tablename__ = 'tasks'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    id_conciliacion = Column(Integer, ForeignKey('conciliaciones.id'), nullable=False)
+    tipo = Column(String, nullable=False)  # 'deepseek_processing', etc.
+    estado = Column(String, default='pending')  # 'pending', 'processing', 'completed', 'failed'
+    descripcion = Column(Text)
+    progreso = Column(Float, default=0.0)  # Porcentaje de progreso (0-100)
+    created_at = Column(String, default=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    updated_at = Column(String, default=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    # Relación con conciliación
+    conciliacion = relationship("Conciliacion")
+    
+    # Relación con resultados de procesamiento
+    processing_results = relationship("DeepSeekProcessingResult", back_populates="task", cascade="all, delete-orphan")

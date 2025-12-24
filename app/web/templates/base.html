@@ -38,6 +38,7 @@
                     <li class="nav-item d-none" id="conciliacionesNavItem">
                         <a class="nav-link {% if request.path == '/conciliaciones' %}active{% endif %}" href="/conciliaciones">
                             <i class="bi bi-list-check me-1"></i>Conciliaciones
+                            <span class="badge bg-warning text-dark ms-1 d-none" id="pendingTasksBadge">0</span>
                         </a>
                     </li>
                     <li class="nav-item d-none" id="empresasNavItem">
@@ -48,6 +49,7 @@
                     <li class="nav-item d-none" id="estadisticasNavItem">
                         <a class="nav-link {% if request.path == '/estadisticas' %}active{% endif %}" href="/estadisticas">
                             <i class="bi bi-graph-up-arrow me-1"></i>Estadísticas
+                            <span class="badge bg-info text-white ms-1 d-none" id="activeTasksBadge">0</span>
                         </a>
                     </li>
                     <li class="nav-item d-none" id="usuariosNavItem">
@@ -159,6 +161,76 @@
                 if (usuariosNavItem) usuariosNavItem.classList.add('d-none');
                 if (estadisticasNavItem) estadisticasNavItem.classList.add('d-none');
                 if (plantillaNavItem) plantillaNavItem.classList.add('d-none');
+            }
+        });
+    </script>
+
+    <!-- Script para actualizar contador de tareas pendientes -->
+    <script>
+        async function updatePendingTasksCount() {
+            try {
+                const response = await fetch('/api/conciliaciones/tasks/pending/count', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${Auth.getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const badge = document.getElementById('pendingTasksBadge');
+                    const count = data.pending_tasks || 0;
+
+                    if (count > 0) {
+                        badge.textContent = count;
+                        badge.classList.remove('d-none');
+                    } else {
+                        badge.classList.add('d-none');
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating pending tasks count:', error);
+            }
+        }
+
+        async function updateActiveTasksCount() {
+            try {
+                const response = await fetch('/api/conciliaciones/tasks/active/count', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${Auth.getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const badge = document.getElementById('activeTasksBadge');
+                    const count = data.active_tasks || 0;
+
+                    if (count > 0) {
+                        badge.textContent = count;
+                        badge.classList.remove('d-none');
+                    } else {
+                        badge.classList.add('d-none');
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating active tasks count:', error);
+            }
+        }
+
+        // Actualizar contador cuando se carga la página si el usuario está autenticado
+        document.addEventListener('DOMContentLoaded', function() {
+            if (Auth.isAuthenticated()) {
+                updatePendingTasksCount();
+                updateActiveTasksCount();
+                // Actualizar cada 30 segundos
+                setInterval(() => {
+                    updatePendingTasksCount();
+                    updateActiveTasksCount();
+                }, 30000);
             }
         });
     </script>

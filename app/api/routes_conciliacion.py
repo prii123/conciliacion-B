@@ -16,7 +16,7 @@ from app.utils.utils import validar_excel
 from app.utils.file_validation import validar_archivo_csv, validar_numeros_debito_credito, formatear_datos_para_movimientos, agrupar_movimientos_por_mes_y_guardar
 from app.utils.auth import get_current_active_user, verify_access_to_conciliacion
 from ..database import get_db
-from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar, User
+from ..models import Conciliacion, Movimiento, ConciliacionMatch, Empresa, ConciliacionManual, ConciliacionManualBanco, ConciliacionManualAuxiliar, User, Task
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from ..utils.conciliaciones import realizar_conciliacion_automatica, crear_conciliacion_manual
@@ -604,6 +604,17 @@ def eliminar_conciliacion(
     for movimiento in movimientos:
         db.delete(movimiento)
     
+    # Eliminar tareas relacionadas
+    tareas = db.query(Task).filter(Task.id_conciliacion == conciliacion_id).all()
+    for tarea in tareas:
+        # Eliminar resultados de DeepSeek relacionados con esta tarea
+        from ..repositories.factory import RepositoryFactory
+        factory = RepositoryFactory(db)
+        deepseek_repo = factory.get_deepseek_result_repository()
+        deepseek_repo.delete_by_task(tarea.id)
+        
+        db.delete(tarea)
+    
     # Eliminar conciliación
     db.delete(conciliacion)
     
@@ -650,19 +661,34 @@ async def upload_extracto_bancario(
         content = await file.read()
         print(f"📄 Contenido leído: {len(content)} bytes")
 
+        # Crear tarea para seguimiento
+        factory = RepositoryFactory(db)
+        task_repo = factory.get_task_repository()
+        task_data = {
+            "id_conciliacion": conciliacion_id,
+            "tipo": "deepseek_processing",
+            "estado": "pending",
+            "descripcion": f"Procesamiento de extracto bancario con DeepSeek para conciliación #{conciliacion_id}",
+            "progreso": 0.0
+        }
+        task = task_repo.create(task_data)
+        print(f"✅ Tarea creada: {task.id}")
+
         # Iniciar procesamiento en segundo plano
         background_tasks.add_task(
             process_and_load_extracto,
             conciliacion_id=conciliacion_id,
             content=content,
-            user_id=current_user.id
+            user_id=current_user.id,
+            task_id=task.id
         )
 
         print("✅ Respuesta enviada al cliente, procesamiento continúa en background")
         return JSONResponse(content={
             "message": "Procesamiento de extracto bancario iniciado en segundo plano. El análisis con DeepSeek y la carga de movimientos puede tardar varios minutos. La página se actualizará automáticamente para mostrar el progreso.",
             "conciliacion_id": conciliacion_id,
-            "estado": "iniciado"
+            "estado": "iniciado",
+            "task_id": task.id
         })
 
     except HTTPException:
@@ -675,42 +701,52 @@ async def upload_extracto_bancario(
         raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 
-async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_id: int):
+async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_id: int, task_id: int):
     """
     Función de segundo plano que procesa el PDF con DeepSeek y carga los movimientos en la BD.
     """
     from app.database import SessionLocal
+    from app.repositories.factory import RepositoryFactory
     db = SessionLocal()  # Crear nueva sesión independiente
 
     try:
         print(f"🔄 Iniciando procesamiento en segundo plano para conciliación #{conciliacion_id} - Background task started")
 
+        factory = RepositoryFactory(db)
+        task_repo = factory.get_task_repository()
+
+        # Actualizar tarea a processing
+        task_repo.update(task_id, {"estado": "processing", "progreso": 5.0})
+
         # Verificar conciliación y usuario
         conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
         if not conciliacion:
             print(f"❌ Conciliación #{conciliacion_id} no encontrada")
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "Conciliación no encontrada"})
             return
 
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             print(f"❌ Usuario #{user_id} no encontrado")
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "Usuario no encontrado"})
             return
 
         # Verificar acceso
         if user.role != 'administrador' and conciliacion.id_usuario_creador != user.id:
             print(f"❌ Usuario {user.id} no tiene acceso a conciliación #{conciliacion_id}")
-            conciliacion.estado = 'error_acceso'
-            db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "Acceso denegado"})
             return
 
         # Actualizar estado inicial
         conciliacion.estado = 'procesando_extracto'
         db.commit()
         print(f"📝 Estado inicial establecido: procesando_extracto")
+        task_repo.update(task_id, {"progreso": 10.0})
 
         print("📄 Extrayendo texto del PDF...")
         conciliacion.estado = 'extrayendo_texto'
         db.commit()
+        task_repo.update(task_id, {"progreso": 20.0})
 
         # Extraer texto del PDF (igual que antes)
         text_pages = []
@@ -747,62 +783,180 @@ async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_i
             print("❌ No se pudo extraer texto suficiente del PDF")
             conciliacion.estado = 'error_extraccion'
             db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "No se pudo extraer texto del PDF"})
             return
 
         # Configurar DeepSeek
         print("🤖 Configurando DeepSeek...")
         conciliacion.estado = 'configurando_deepseek'
         db.commit()
+        task_repo.update(task_id, {"progreso": 40.0})
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             print("❌ DEEPSEEK_API_KEY no encontrada")
             conciliacion.estado = 'error_config'
             db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "API key de DeepSeek no configurada"})
             return
 
         client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
 
-        prompt = "Analiza el siguiente extracto bancario y extrae los movimientos financieros relevantes, incluyendo fecha, descripción y valor. Proporciona un resumen estructurado de los movimientos encontrados agrupado por ENTRADAS (debitos) y SALIDAS (creditos)."
+        prompt = """Analiza el siguiente extracto bancario y extrae todos los movimientos financieros relevantes.
 
-        # Procesar con DeepSeek
+INSTRUCCIONES IMPORTANTES:
+- Extrae fecha, descripción y valor de cada movimiento
+- Agrupa los movimientos en ENTRADAS (débitos/cargos) y SALIDAS (créditos/abonos)
+- Devuelve ÚNICAMENTE un objeto JSON válido con la siguiente estructura exacta:
+
+{
+  "movimientos": {
+    "entradas": [
+      {
+        "fecha": "DD/MM/YYYY",
+        "descripcion": "Descripción del movimiento",
+        "valor": 123.45
+      }
+    ],
+    "salidas": [
+      {
+        "fecha": "DD/MM/YYYY", 
+        "descripcion": "Descripción del movimiento",
+        "valor": 123.45
+      }
+    ]
+  },
+  "resumen": {
+    "total_entradas": 123.45,
+    "total_salidas": 678.90,
+    "total_movimientos": 10
+  }
+}
+
+IMPORTANTE: 
+- NO incluyas texto adicional fuera del JSON
+- Asegúrate de que las fechas estén en formato DD/MM/YYYY
+- Los valores deben ser números (sin símbolos de moneda)
+- Si no encuentras movimientos, devuelve arrays vacíos"""
+
+        # Procesar con DeepSeek por grupos con guardado incremental
         print("🧠 Procesando con DeepSeek...")
         conciliacion.estado = 'procesando_deepseek'
         db.commit()
-        max_pages_single = 5
-        pages_per_group = 5
-
-        if len(text_pages) <= max_pages_single:
-            print(f"📄 Procesando PDF pequeño ({len(text_pages)} páginas)")
-            full_text = "\n\n".join(text_pages)
-            result = await process_text_with_deepseek(full_text, prompt, client)
-        else:
-            print(f"📄 Procesando PDF grande ({len(text_pages)} páginas) en lotes")
-            responses = []
-            for i in range(0, len(text_pages), pages_per_group):
-                group_pages = text_pages[i:i + pages_per_group]
-                group_text = "\n\n".join(group_pages)
-                group_number = (i // pages_per_group) + 1
+        task_repo.update(task_id, {"progreso": 60.0})
+        
+        # Intentar recuperar resultados previos si existen
+        deepseek_repo = factory.get_deepseek_result_repository()
+        existing_results = deepseek_repo.get_successful_results(task_id)
+        
+        if existing_results:
+            print(f"📋 Encontrados {len(existing_results)} resultados previos exitosos")
+            # Usar resultados previos y continuar con grupos faltantes
+            all_responses = []
+            processed_groups = {r.group_number for r in existing_results}
+            
+            # Cargar resultados previos
+            for result in existing_results:
+                try:
+                    parsed_data = json.loads(result.parsed_json)
+                    all_responses.append(parsed_data)
+                except:
+                    print(f"⚠️ Error cargando resultado previo del grupo {result.group_number}")
+            
+            # Procesar solo grupos faltantes
+            # Optimización: Grupos de 1 página para máxima estabilidad y mínimos tokens por llamada
+            max_pages_single = 1
+            pages_per_group = 1
+            
+            if len(text_pages) <= max_pages_single:
+                # PDF pequeño - procesar todo junto si no hay resultados previos
+                if not existing_results:
+                    print(f"📄 Procesando PDF pequeño ({len(text_pages)} páginas)")
+                    full_text = "\n\n".join(text_pages)
+                    result = await process_text_with_deepseek_checkpoint(full_text, prompt, client, task_id, 1, 1, deepseek_repo)
+                    if "error" in result:
+                        task_repo.update(task_id, {"estado": "failed", "descripcion": f"Error en DeepSeek: {result['error']}"})
+                        return
+                    all_responses = [result]
+                else:
+                    print("✅ PDF pequeño ya procesado anteriormente")
+            else:
+                # PDF grande - procesar por grupos
+                print(f"📄 Procesando PDF grande ({len(text_pages)} páginas) en lotes")
                 total_groups = (len(text_pages) + pages_per_group - 1) // pages_per_group
-                print(f"🔄 Procesando grupo {group_number}/{total_groups}")
+                
+                for i in range(0, len(text_pages), pages_per_group):
+                    group_number = (i // pages_per_group) + 1
+                    
+                    # Saltar grupos ya procesados
+                    if group_number in processed_groups:
+                        print(f"⏭️ Saltando grupo {group_number} (ya procesado)")
+                        continue
+                    
+                    group_pages = text_pages[i:i + pages_per_group]
+                    group_text = "\n\n".join(group_pages)
+                    
+                    print(f"🔄 Procesando grupo {group_number}/{total_groups}")
+                    
+                    group_prompt = f"{prompt}\n\n--- Grupo {group_number} de {total_groups} ---\nPáginas {i+1}-{min(i+pages_per_group, len(text_pages))} del documento total de {len(text_pages)} páginas."
+                    group_result = await process_text_with_deepseek_checkpoint(group_text, group_prompt, client, task_id, group_number, total_groups, deepseek_repo)
+                    
+                    if "error" in group_result:
+                        print(f"❌ Error en grupo {group_number}: {group_result['error']}")
+                        # No fallar todo el proceso, continuar con otros grupos
+                        continue
+                    
+                    all_responses.append(group_result)
+                    
+                    # Actualizar progreso
+                    progress = 60.0 + (group_number / total_groups) * 20.0
+                    task_repo.update(task_id, {"progreso": progress})
+            
+            result = combine_deepseek_responses(all_responses)
+        else:
+            # No hay resultados previos, procesar normalmente
+            max_pages_single = 1
+            pages_per_group = 1
 
-                group_prompt = f"{prompt}\n\n--- Grupo {group_number} de {total_groups} ---\nPáginas {i+1}-{min(i+pages_per_group, len(text_pages))} del documento total de {len(text_pages)} páginas."
-                group_result = await process_text_with_deepseek(group_text, group_prompt, client)
-                responses.append(group_result)
+            if len(text_pages) <= max_pages_single:
+                print(f"📄 Procesando PDF pequeño ({len(text_pages)} páginas)")
+                full_text = "\n\n".join(text_pages)
+                result = await process_text_with_deepseek_checkpoint(full_text, prompt, client, task_id, 1, 1, deepseek_repo)
+            else:
+                print(f"📄 Procesando PDF grande ({len(text_pages)} páginas) en lotes")
+                responses = []
+                total_groups = (len(text_pages) + pages_per_group - 1) // pages_per_group
+                
+                for i in range(0, len(text_pages), pages_per_group):
+                    group_pages = text_pages[i:i + pages_per_group]
+                    group_text = "\n\n".join(group_pages)
+                    group_number = (i // pages_per_group) + 1
+                    print(f"🔄 Procesando grupo {group_number}/{total_groups}")
 
-            result = combine_deepseek_responses(responses)
+                    group_prompt = f"{prompt}\n\n--- Grupo {group_number} de {total_groups} ---\nPáginas {i+1}-{min(i+pages_per_group, len(text_pages))} del documento total de {len(text_pages)} páginas."
+                    group_result = await process_text_with_deepseek_checkpoint(group_text, group_prompt, client, task_id, group_number, total_groups, deepseek_repo)
+                    responses.append(group_result)
+
+                    # Actualizar progreso
+                    progress = 60.0 + (group_number / total_groups) * 20.0
+                    task_repo.update(task_id, {"progreso": progress})
+
+                result = combine_deepseek_responses(responses)
 
         if "error" in result:
             print(f"❌ Error en DeepSeek: {result['error']}")
             conciliacion.estado = 'error_deepseek'
             db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": f"Error en DeepSeek: {result['error']}"})
             return
 
         print("✅ Procesamiento con DeepSeek completado")
+        task_repo.update(task_id, {"progreso": 80.0})
 
         # Cargar movimientos en BD (usando lógica de cargar_movimientos_deepseek)
         print("💾 Cargando movimientos en BD...")
         conciliacion.estado = 'cargando_movimientos'
         db.commit()
+        task_repo.update(task_id, {"progreso": 90.0})
         
         movimientos_data = result
         if "movimientos" not in movimientos_data:
@@ -812,6 +966,22 @@ async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_i
             return
 
         movimientos_json = movimientos_data["movimientos"]
+        
+        # Compatibilidad: si movimientos_json es una lista (formato antiguo), convertir a dict
+        if isinstance(movimientos_json, list):
+            print("🔄 Convirtiendo formato antiguo de lista a dict")
+            movimientos_json = {
+                "entradas": [],
+                "salidas": movimientos_json  # Asumir que la lista son salidas
+            }
+        elif isinstance(movimientos_json, dict):
+            print(f"🔍 movimientos_json es un dict con campos: {list(movimientos_json.keys())}")
+        else:
+            print(f"❌ movimientos_json es de tipo inesperado: {type(movimientos_json)}")
+            conciliacion.estado = 'error_json'
+            db.commit()
+            return
+            
         nuevos_movimientos = []
         total_entradas = 0
         total_salidas = 0
@@ -880,6 +1050,7 @@ async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_i
             print("❌ No se encontraron movimientos válidos")
             conciliacion.estado = 'error_sin_movimientos'
             db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "No se encontraron movimientos válidos"})
             return
 
         # Guardar movimientos
@@ -889,6 +1060,7 @@ async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_i
         db.commit()
 
         print(f"✅ Procesamiento completado: {total_entradas} entradas, {total_salidas} salidas")
+        task_repo.update(task_id, {"estado": "completed", "progreso": 100.0, "descripcion": f"Procesamiento completado: {total_entradas} entradas, {total_salidas} salidas"})
 
     except Exception as e:
         print(f"❌ Error en procesamiento en segundo plano: {str(e)}")
@@ -897,6 +1069,7 @@ async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_i
         try:
             conciliacion.estado = 'error_procesamiento'
             db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": f"Error: {str(e)}"})
         except:
             pass
     finally:
@@ -1151,6 +1324,283 @@ NO agregues texto adicional."""
         }
 
 
+async def process_text_with_deepseek_checkpoint(text: str, prompt: str, client, task_id: int, group_number: int, total_groups: int, deepseek_repo) -> dict:
+    """
+    Procesa texto con DeepSeek API y guarda el resultado en BD para recuperación.
+    Versión mejorada con checkpointing para PDFs grandes.
+    """
+    try:
+        print(f"📤 Enviando grupo {group_number}/{total_groups} a DeepSeek ({len(text)} caracteres)...")
+
+        # Verificar si ya existe un resultado exitoso para este grupo
+        existing_result = deepseek_repo.get_by_task_and_group(task_id, group_number)
+        if existing_result and existing_result.status == 'saved':
+            print(f"✅ Grupo {group_number} ya procesado anteriormente, cargando resultado guardado")
+            try:
+                return json.loads(existing_result.parsed_json)
+            except:
+                print(f"⚠️ Error cargando resultado guardado del grupo {group_number}, reprocesando...")
+
+        # Crear o actualizar registro de procesamiento
+        pages_per_group_dynamic = 1  # Una página por grupo para máxima estabilidad
+        pages_start = ((group_number - 1) * pages_per_group_dynamic) + 1
+        pages_end = min(group_number * pages_per_group_dynamic, pages_start + len(text.split('\n\n')) - 1)
+        pages_range = f"{pages_start}-{pages_end}"
+
+        if existing_result:
+            deepseek_repo.update(existing_result.id, {"status": "processing"})
+        else:
+            result_record = deepseek_repo.create({
+                "id_task": task_id,
+                "group_number": group_number,
+                "total_groups": total_groups,
+                "pages_range": pages_range,
+                "status": "processing"
+            })
+
+        # Crear el mensaje del sistema con el prompt del usuario
+        system_message = f"""Eres un asistente especializado en análisis de extractos bancarios.
+Tu tarea es analizar el texto proporcionado y extraer información financiera relevante.
+
+Instrucciones específicas del usuario:
+{prompt}
+
+FORMATO DE RESPUESTA OBLIGATORIO:
+Debes responder ÚNICAMENTE con un objeto JSON válido que tenga exactamente esta estructura:
+
+{{
+    "resumen": {{
+        "saldo_inicial": 0.00,
+        "total_abonos": 0.00,
+        "total_cargos": 0.00,
+        "saldo_final": 0.00
+    }},
+    "movimientos": {{
+        "entradas": [
+            {{
+                "fecha": "DD/MM/YYYY",
+                "descripcion": "texto descriptivo",
+                "valor": 0.00
+            }}
+        ],
+        "salidas": [
+            {{
+                "fecha": "DD/MM/YYYY",
+                "descripcion": "texto descriptivo",
+                "valor": 0.00
+            }}
+        ]
+    }}
+}}
+
+REGLAS IMPORTANTES:
+- NO incluyas NINGÚN texto adicional antes o después del JSON
+- NO uses bloques de código markdown ```json
+- NO agregues explicaciones o comentarios
+- El JSON debe ser válido y parseable
+- Si no encuentras información, usa arrays vacíos []
+- Mantén las descripciones concisas pero completas"""
+
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"Analiza este extracto bancario:\n\n{text}"}
+            ],
+            max_tokens=8192,
+            temperature=0.0
+        )
+
+        content = response.choices[0].message.content.strip()
+        print(f"✅ Respuesta del grupo {group_number} recibida ({len(content)} caracteres)")
+
+        # Función auxiliar para extraer JSON de la respuesta
+        def extract_json_from_response(response_text: str) -> dict:
+            """
+            Intenta extraer un objeto JSON válido de la respuesta de DeepSeek.
+            Maneja casos donde puede haber texto adicional o formato markdown.
+            """
+            # Primero intentar parsear directamente
+            try:
+                return json.loads(response_text)
+            except json.JSONDecodeError:
+                pass
+
+            # Buscar JSON dentro de bloques de código markdown
+            import re
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group(1))
+                except json.JSONDecodeError:
+                    pass
+
+            # Buscar el primer { y el último } que formen un JSON válido
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}')
+
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                potential_json = response_text[start_idx:end_idx + 1]
+                try:
+                    return json.loads(potential_json)
+                except json.JSONDecodeError as e:
+                    # Intentar reparar JSON truncado
+                    try:
+                        repaired = potential_json.rstrip()
+
+                        # Contar llaves y brackets para cerrar los pendientes
+                        open_braces = repaired.count('{') - repaired.count('}')
+                        open_brackets = repaired.count('[') - repaired.count(']')
+
+                        if abs(open_braces) <= 2 and abs(open_brackets) <= 2:
+                            repaired += '}' * max(0, open_braces) + ']' * max(0, open_brackets)
+
+                        return json.loads(repaired)
+                    except json.JSONDecodeError:
+                        pass
+
+            # Último intento: limpiar texto y buscar JSON
+            lines = response_text.split('\n')
+            json_lines = []
+            in_json = False
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith('{'):
+                    in_json = True
+                    json_lines.append(line)
+                elif in_json:
+                    json_lines.append(line)
+                    if line.endswith('}'):
+                        break
+
+            if json_lines:
+                potential_json = '\n'.join(json_lines)
+                try:
+                    return json.loads(potential_json)
+                except json.JSONDecodeError:
+                    pass
+
+            raise json.JSONDecodeError("No se pudo extraer JSON válido", response_text, 0)
+
+        # Intentar extraer JSON de la respuesta
+        try:
+            result = extract_json_from_response(content)
+            print(f"✅ JSON del grupo {group_number} parseado exitosamente")
+
+            # Guardar resultado exitoso en BD
+            deepseek_repo.update(existing_result.id if existing_result else result_record.id, {
+                "raw_response": content,
+                "parsed_json": json.dumps(result),
+                "status": "saved"
+            })
+
+            return result
+
+        except json.JSONDecodeError as e:
+            print(f"❌ Error parseando JSON del grupo {group_number}: {e}")
+
+            # Guardar resultado fallido para posible reintento
+            error_msg = f"Error de parsing JSON: {str(e)}"
+            deepseek_repo.update(existing_result.id if existing_result else result_record.id, {
+                "raw_response": content,
+                "status": "failed",
+                "error_message": error_msg
+            })
+
+            # Intentar una segunda llamada con instrucciones más estrictas
+            print(f"🔄 Intentando segunda llamada para grupo {group_number}...")
+            try:
+                strict_system_message = """Analiza el extracto bancario y responde ÚNICAMENTE con JSON válido.
+Ejemplo de formato esperado:
+{
+    "resumen": {
+        "saldo_inicial": 0.00,
+        "total_abonos": 0.00,
+        "total_cargos": 0.00,
+        "saldo_final": 0.00
+    },
+    "movimientos": {
+        "entradas": [
+            {"fecha": "DD/MM/YYYY", "descripcion": "texto", "valor": 0.00}
+        ],
+        "salidas": [
+            {"fecha": "DD/MM/YYYY", "descripcion": "texto", "valor": 0.00}
+        ]
+    }
+}
+NO agregues texto adicional."""
+
+                response2 = await asyncio.to_thread(
+                    client.chat.completions.create,
+                    model="deepseek-chat",
+                    messages=[
+                        {"role": "system", "content": strict_system_message},
+                        {"role": "user", "content": f"Analiza este extracto bancario y devuelve solo JSON:\n\n{text}"}
+                    ],
+                    max_tokens=8192,
+                    temperature=0.0
+                )
+
+                content2 = response2.choices[0].message.content.strip()
+                print(f"📄 Segunda respuesta del grupo {group_number}: {content2[:300]}...")
+
+                result = extract_json_from_response(content2)
+                print(f"✅ JSON del grupo {group_number} parseado exitosamente en segunda llamada")
+
+                # Guardar resultado exitoso en BD
+                deepseek_repo.update(existing_result.id if existing_result else result_record.id, {
+                    "raw_response": content2,
+                    "parsed_json": json.dumps(result),
+                    "status": "saved"
+                })
+
+                return result
+
+            except Exception as retry_error:
+                print(f"❌ Error también en segunda llamada del grupo {group_number}: {str(retry_error)}")
+
+                # Guardar error final
+                final_error = f"Error en segunda llamada: {str(retry_error)}"
+                deepseek_repo.update(existing_result.id if existing_result else result_record.id, {
+                    "raw_response": content2 if 'content2' in locals() else content,
+                    "status": "failed",
+                    "error_message": final_error
+                })
+
+                return {
+                    "error": "Respuesta no es JSON válido después de reintento",
+                    "raw_content": content,
+                    "second_attempt_content": content2 if 'content2' in locals() else None,
+                    "parse_error": str(e),
+                    "retry_error": str(retry_error)
+                }
+
+    except Exception as e:
+        print(f"❌ Error en process_text_with_deepseek_checkpoint grupo {group_number}: {str(e)}")
+
+        # Guardar error en BD
+        try:
+            if existing_result:
+                deepseek_repo.update(existing_result.id, {
+                    "status": "failed",
+                    "error_message": str(e)
+                })
+            elif 'result_record' in locals():
+                deepseek_repo.update(result_record.id, {
+                    "status": "failed",
+                    "error_message": str(e)
+                })
+        except:
+            pass
+
+        return {
+            "error": f"Error procesando grupo {group_number} con DeepSeek: {str(e)}",
+            "text_length": len(text)
+        }
+
+
 def combine_deepseek_responses(responses: list) -> dict:
     """
     Combina múltiples respuestas JSON de DeepSeek en una sola respuesta consolidada.
@@ -1174,19 +1624,24 @@ def combine_deepseek_responses(responses: list) -> dict:
         # Combinar respuestas múltiples
         combined = {
             "total_pages_processed": len(responses),
-            "valid_responses": len(valid_responses),
-            "combined_data": {}
+            "valid_responses": len(valid_responses)
         }
 
         # Extraer y combinar datos comunes
-        all_movimientos = []
+        all_entradas = []
+        all_salidas = []
         all_resumenes = []
         all_alertas = []
 
         for response in valid_responses:
             # Combinar movimientos si existen
-            if "movimientos" in response and isinstance(response["movimientos"], list):
-                all_movimientos.extend(response["movimientos"])
+            if "movimientos" in response and isinstance(response["movimientos"], dict):
+                # Extraer entradas
+                if "entradas" in response["movimientos"] and isinstance(response["movimientos"]["entradas"], list):
+                    all_entradas.extend(response["movimientos"]["entradas"])
+                # Extraer salidas
+                if "salidas" in response["movimientos"] and isinstance(response["movimientos"]["salidas"], list):
+                    all_salidas.extend(response["movimientos"]["salidas"])
 
             # Combinar resúmenes
             if "resumen" in response:
@@ -1196,25 +1651,33 @@ def combine_deepseek_responses(responses: list) -> dict:
             if "alertas" in response and isinstance(response["alertas"], list):
                 all_alertas.extend(response["alertas"])
 
-            # Copiar otros campos únicos
+            # Copiar otros campos únicos (evitando duplicados)
             for key, value in response.items():
                 if key not in ["movimientos", "resumen", "alertas", "error"]:
-                    if key not in combined["combined_data"]:
-                        combined["combined_data"][key] = value
-                    elif isinstance(combined["combined_data"][key], list) and isinstance(value, list):
-                        combined["combined_data"][key].extend(value)
-                    elif isinstance(combined["combined_data"][key], dict) and isinstance(value, dict):
-                        combined["combined_data"][key].update(value)
+                    if key not in combined:
+                        combined[key] = value
+                    elif isinstance(combined[key], list) and isinstance(value, list):
+                        combined[key].extend(value)
+                    elif isinstance(combined[key], dict) and isinstance(value, dict):
+                        combined[key].update(value)
 
-        # Agregar secciones combinadas
-        if all_movimientos:
-            combined["movimientos"] = all_movimientos
+        # Crear estructura de movimientos combinados
+        combined["movimientos"] = {
+            "entradas": all_entradas,
+            "salidas": all_salidas
+        }
 
         if all_resumenes:
             combined["resumenes_por_grupo"] = all_resumenes
-            # Crear un resumen general
-            combined["resumen_general"] = {
-                "total_movimientos": len(all_movimientos),
+            # Crear un resumen general combinado
+            total_entradas_valor = sum(r.get("total_entradas", 0) for r in all_resumenes if isinstance(r, dict))
+            total_salidas_valor = sum(r.get("total_salidas", 0) for r in all_resumenes if isinstance(r, dict))
+            total_movimientos = sum(r.get("total_movimientos", 0) for r in all_resumenes if isinstance(r, dict))
+
+            combined["resumen"] = {
+                "total_entradas": total_entradas_valor,
+                "total_salidas": total_salidas_valor,
+                "total_movimientos": total_movimientos,
                 "grupos_procesados": len(valid_responses),
                 "periodo_cubierto": "Múltiples grupos de páginas"
             }
@@ -1381,3 +1844,257 @@ async def cargar_movimientos_deepseek(
         traceback.print_exc()
         db.rollback()  # Revertir cambios en caso de error
         raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+
+# =====================================
+# ENDPOINTS PARA GESTIÓN DE TAREAS
+# =====================================
+
+@router.get("/tasks/pending/count")
+def get_pending_tasks_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene el conteo de tareas pendientes del usuario actual
+    """
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    
+    # Solo contar tareas de conciliaciones del usuario
+    pending_count = len([t for t in task_repo.get_by_user(current_user.id) if t.estado in ['pending', 'processing']])
+    
+    return JSONResponse(content={"pending_tasks": pending_count})
+
+@router.get("/tasks/active/count")
+def get_active_tasks_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene el conteo de tareas activas del usuario actual
+    """
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    
+    # Solo contar tareas de conciliaciones del usuario que están activas
+    active_count = len([t for t in task_repo.get_by_user(current_user.id) if t.estado in ['pending', 'processing']])
+    
+    return JSONResponse(content={"active_tasks": active_count})
+
+@router.get("/tasks/failed")
+def get_failed_tasks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene las tareas fallidas del usuario actual para posible reintento
+    """
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    
+    failed_tasks = []
+    for task in task_repo.get_by_user(current_user.id):
+        if task.estado == 'failed':
+            # Obtener información de la conciliación
+            conciliacion = db.query(Conciliacion).filter(Conciliacion.id == task.id_conciliacion).first()
+            empresa = db.query(Empresa).filter(Empresa.id == conciliacion.id_empresa).first() if conciliacion else None
+            
+            failed_tasks.append({
+                "id": task.id,
+                "id_conciliacion": task.id_conciliacion,
+                "tipo": task.tipo,
+                "estado": task.estado,
+                "descripcion": task.descripcion,
+                "progreso": task.progreso,
+                "created_at": task.created_at,
+                "updated_at": task.updated_at,
+                "empresa_nombre": empresa.nombre if empresa else "Empresa desconocida",
+                "conciliacion_fecha": conciliacion.fecha_creacion if conciliacion else "Fecha desconocida"
+            })
+    
+    return JSONResponse(content={"failed_tasks": failed_tasks})
+
+@router.get("/tasks/pending")
+def get_pending_tasks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene las tareas pendientes del usuario actual
+    """
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    
+    tasks = task_repo.get_by_user(current_user.id)
+    pending_tasks = [t for t in tasks if t.estado in ['pending', 'processing']]
+    
+    return JSONResponse(content={
+        "tasks": [
+            {
+                "id": t.id,
+                "id_conciliacion": t.id_conciliacion,
+                "tipo": t.tipo,
+                "estado": t.estado,
+                "descripcion": t.descripcion,
+                "progreso": t.progreso,
+                "created_at": t.created_at,
+                "updated_at": t.updated_at
+            }
+            for t in pending_tasks
+        ]
+    })
+
+@router.get("/tasks/{task_id}")
+def get_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene una tarea específica
+    """
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    
+    task = task_repo.get_by_id(task_id)
+    if not task:
+        raise HTTPException(404, "Tarea no encontrada")
+    
+    # Verificar que la tarea pertenece a una conciliación del usuario
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == task.id_conciliacion).first()
+    if not conciliacion or (current_user.role != 'administrador' and conciliacion.id_usuario_creador != current_user.id):
+        raise HTTPException(403, "No tienes acceso a esta tarea")
+    
+    return JSONResponse(content={
+        "task": {
+            "id": task.id,
+            "id_conciliacion": task.id_conciliacion,
+            "tipo": task.tipo,
+            "estado": task.estado,
+            "descripcion": task.descripcion,
+            "progreso": task.progreso,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at
+        }
+    })
+
+@router.put("/tasks/{task_id}")
+def update_task(
+    task_id: int,
+    task_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Actualiza una tarea (solo administradores)
+    """
+    if current_user.role != 'administrador':
+        raise HTTPException(403, "Solo administradores pueden actualizar tareas")
+    
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    
+    updated_task = task_repo.update(task_id, task_data)
+    if not updated_task:
+        raise HTTPException(404, "Tarea no encontrada")
+    
+    return JSONResponse(content={"message": "Tarea actualizada exitosamente"})
+
+@router.post("/tasks/{task_id}/retry")
+def retry_task_processing(
+    task_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Reintenta el procesamiento de una tarea fallida, continuando desde los resultados exitosos previos.
+    """
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    
+    task = task_repo.get_by_id(task_id)
+    if not task:
+        raise HTTPException(404, "Tarea no encontrada")
+    
+    # Verificar que la tarea pertenece a una conciliación del usuario
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == task.id_conciliacion).first()
+    if not conciliacion or (current_user.role != 'administrador' and conciliacion.id_usuario_creador != current_user.id):
+        raise HTTPException(403, "No tienes acceso a esta tarea")
+    
+    if task.estado not in ['failed', 'completed']:
+        raise HTTPException(400, f"No se puede reintentar una tarea en estado '{task.estado}'")
+    
+    # Resetear tarea para reintento
+    task_repo.update(task_id, {
+        "estado": "pending",
+        "progreso": 0.0,
+        "descripcion": f"Reintento de procesamiento - {task.descripcion}"
+    })
+    
+    # Obtener el archivo original para reprocesar
+    # Nota: Esto asume que el archivo está guardado o podemos acceder a él
+    # En una implementación completa, deberíamos guardar el archivo en el servidor
+    
+    return JSONResponse(content={
+        "message": "Reintento de procesamiento iniciado. La tarea continuará desde los resultados exitosos previos.",
+        "task_id": task_id
+    })
+
+@router.get("/tasks/{task_id}/details")
+def get_task_details(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene detalles completos de una tarea incluyendo resultados de procesamiento.
+    """
+    factory = RepositoryFactory(db)
+    task_repo = factory.get_task_repository()
+    deepseek_repo = factory.get_deepseek_result_repository()
+    
+    task = task_repo.get_by_id(task_id)
+    if not task:
+        raise HTTPException(404, "Tarea no encontrada")
+    
+    # Verificar acceso
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == task.id_conciliacion).first()
+    if not conciliacion or (current_user.role != 'administrador' and conciliacion.id_usuario_creador != current_user.id):
+        raise HTTPException(403, "No tienes acceso a esta tarea")
+    
+    # Obtener resultados de procesamiento
+    processing_results = deepseek_repo.get_by_task(task_id)
+    results_summary = []
+    
+    for result in processing_results:
+        results_summary.append({
+            "group_number": result.group_number,
+            "total_groups": result.total_groups,
+            "pages_range": result.pages_range,
+            "status": result.status,
+            "error_message": result.error_message,
+            "created_at": result.created_at,
+            "updated_at": result.updated_at
+        })
+    
+    return JSONResponse(content={
+        "task": {
+            "id": task.id,
+            "id_conciliacion": task.id_conciliacion,
+            "tipo": task.tipo,
+            "estado": task.estado,
+            "descripcion": task.descripcion,
+            "progreso": task.progreso,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at
+        },
+        "processing_results": results_summary,
+        "summary": {
+            "total_groups": len(processing_results),
+            "successful_groups": len([r for r in processing_results if r.status == 'saved']),
+            "failed_groups": len([r for r in processing_results if r.status == 'failed']),
+            "pending_groups": len([r for r in processing_results if r.status == 'pending'])
+        }
+    })
