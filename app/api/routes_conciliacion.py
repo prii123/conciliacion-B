@@ -8,6 +8,7 @@ import PyPDF2
 import openai
 import os
 import pdfplumber
+import asyncio
 import json
 import re
 
@@ -271,7 +272,8 @@ async def upload_files(
             "nombre_archivo_auxiliar": file_auxiliar.filename,
             "mes_conciliado": mes,
             "cuenta_conciliada": cuenta,
-            "año_conciliado": anio
+            "año_conciliado": anio,
+            "estado": "en_proceso"
         }
         nueva_conciliacion = conciliacion_repo.create(conciliacion_data)
         conciliacion_id = nueva_conciliacion.id
@@ -658,7 +660,7 @@ async def upload_extracto_bancario(
 
         print("✅ Respuesta enviada al cliente, procesamiento continúa en background")
         return JSONResponse(content={
-            "message": "Procesamiento de extracto bancario iniciado. El análisis con DeepSeek y la carga de movimientos puede tardar varios minutos. Refresca la página para ver el progreso.",
+            "message": "Procesamiento de extracto bancario iniciado en segundo plano. El análisis con DeepSeek y la carga de movimientos puede tardar varios minutos. La página se actualizará automáticamente para mostrar el progreso.",
             "conciliacion_id": conciliacion_id,
             "estado": "iniciado"
         })
@@ -951,7 +953,8 @@ REGLAS IMPORTANTES:
 - Si no encuentras información, usa arrays vacíos []
 - Mantén las descripciones concisas pero completas"""
 
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model="deepseek-chat",
             messages=[
                 {"role": "system", "content": system_message},
@@ -1112,7 +1115,8 @@ Ejemplo de formato esperado:
 }
 NO agregues texto adicional."""
 
-                response2 = client.chat.completions.create(
+                response2 = await asyncio.to_thread(
+                    client.chat.completions.create,
                     model="deepseek-chat",
                     messages=[
                         {"role": "system", "content": strict_system_message},

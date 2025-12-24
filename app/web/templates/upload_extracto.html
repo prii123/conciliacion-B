@@ -2,6 +2,151 @@
 
 {% block title %}Subir Extracto Bancario{% endblock %}
 
+{% block style %}
+<style>
+.file-upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.375rem;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+}
+
+.file-upload-area.file-selected {
+    border-color: #0d6efd;
+    background-color: #e7f3ff;
+    box-shadow: 0 0 10px rgba(13, 110, 253, 0.25);
+}
+
+.file-upload-area.file-uploaded {
+    border-color: #198754;
+    background-color: #e8f5e8;
+    box-shadow: 0 0 10px rgba(25, 135, 84, 0.25);
+}
+
+.file-upload-area:hover {
+    border-color: #0d6efd;
+    background-color: #e7f3ff;
+}
+
+.file-upload-icon {
+    font-size: 3rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.file-upload-area.file-selected .file-upload-icon {
+    color: #0d6efd;
+}
+
+.file-upload-area.file-uploaded .file-upload-icon {
+    color: #198754;
+}
+
+.file-upload-text {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.file-upload-area.file-selected .file-upload-text {
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.file-upload-area.file-uploaded .file-upload-text {
+    color: #198754;
+    font-weight: 500;
+}
+
+/* Estilos para el file input similar al macro */
+.file-input-wrapper {
+    margin-bottom: 1rem;
+}
+
+.file-input-label {
+    display: block;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+    position: relative;
+    overflow: hidden;
+}
+
+.file-input-label:hover {
+    border-color: #0d6efd;
+    background-color: #e7f3ff;
+}
+
+.file-input-label.file-selected {
+    border-color: #198754;
+    background-color: #e8f5e8;
+    box-shadow: 0 0 10px rgba(25, 135, 84, 0.25);
+}
+
+.file-input-label.file-selected i {
+    color: #198754;
+}
+
+.file-input-label.file-selected div {
+    color: #198754;
+    font-weight: 500;
+}
+
+.file-input-label.file-uploaded {
+    border-color: #198754;
+    background-color: #e8f5e8;
+    box-shadow: 0 0 10px rgba(25, 135, 84, 0.25);
+}
+
+.file-input-label.file-uploaded i {
+    color: #198754;
+}
+
+.file-input-label.file-uploaded div {
+    color: #198754;
+    font-weight: 500;
+}
+
+.file-input-label i {
+    font-size: 3rem;
+    color: #6c757d;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.file-input-label div {
+    color: #495057;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.file-input-label small {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.file-name {
+    margin-top: 0.5rem;
+    font-weight: 600;
+    color: #0d6efd;
+    display: none;
+}
+
+input[type="file"] {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
@@ -10,6 +155,7 @@
                 <div class="card-header">
                     <h3 class="card-title">Subir Extracto Bancario (PDF) - Conciliación #{{ conciliacion_id }}</h3>
                     <p class="mb-0 text-muted">Cuenta: {{ conciliacion.cuenta_conciliada }} | Mes: {{ conciliacion.mes_conciliado }} {{ conciliacion.año_conciliado }}</p>
+                    <p class="mb-0 text-muted">Estado: {{ conciliacion.estado }}</p>
                     {% if conciliacion.estado == 'procesando_extracto' %}
                     <div class="alert alert-warning mt-2">
                         <i class="bi bi-hourglass-split me-2"></i>
@@ -75,7 +221,7 @@
                         <i class="bi bi-arrow-clockwise me-2"></i>Actualizar Manualmente
                     </button>
                     <script>
-                        // Polling para actualizar el estado cada 10 segundos
+                        // Polling para actualizar el estado cada 5 segundos
                         setInterval(async function() {
                             try {
                                 const response = await fetch(window.location.href, {
@@ -91,7 +237,7 @@
                             } catch (error) {
                                 console.log('Error en polling:', error);
                             }
-                        }, 10000); // Cada 10 segundos
+                        }, 5000); // Cada 5 segundos
                     </script>
                     {% elif conciliacion.estado == 'completado_extracto' %}
                     <div class="alert alert-success">
@@ -104,11 +250,19 @@
                     {% else %}
                     <form id="uploadForm" enctype="multipart/form-data">
                         <input type="hidden" name="conciliacion_id" value="{{ conciliacion_id }}">
-                        <div class="mb-3">
-                            <label for="file" class="form-label">Archivo PDF del Extracto Bancario</label>
-                            <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
-                            <div class="form-text">El procesamiento puede tardar varios minutos dependiendo del tamaño del PDF.</div>
+                        <div class="file-input-wrapper">
+                            <label class="form-label">
+                                <i class="bi bi-file-earmark-pdf me-2"></i>Archivo PDF del Extracto Bancario
+                            </label>
+                            <label for="file" class="file-input-label" id="label_file">
+                                <i class="bi bi-file-earmark-pdf"></i>
+                                <div>Haga clic o arrastre el archivo aquí</div>
+                                <small class="text-muted">Formato: PDF (.pdf)</small>
+                                <div class="file-name" id="name_file"></div>
+                            </label>
+                            <input type="file" name="file" id="file" accept=".pdf" required>
                         </div>
+                        <div class="form-text mb-3">El procesamiento puede tardar varios minutos dependiendo del tamaño del PDF.</div>
                         <button type="submit" class="btn btn-primary" id="submitBtn">
                             <span class="spinner-border spinner-border-sm d-none" role="status"></span>
                             Procesar Extracto
@@ -212,6 +366,21 @@ async function cargarMovimientosABaseDatos() {
     }
 }
 
+// Manejar el cambio de archivo para mostrar el nombre
+document.getElementById('file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const nameDiv = document.getElementById('name_file');
+    
+    if (file) {
+        nameDiv.textContent = file.name;
+        nameDiv.style.display = 'block';
+    } else {
+        nameDiv.textContent = '';
+        nameDiv.style.display = 'none';
+        document.getElementById('label_file').classList.remove('file-uploaded');
+    }
+});
+
 document.getElementById('uploadForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -260,6 +429,10 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
                 </div>
             `;
             resultCard.classList.remove('d-none');
+            
+            // Cambiar el estilo del área de subida a "subido"
+            document.getElementById('label_file').classList.add('file-uploaded');
+            document.getElementById('label_file').classList.remove('file-selected');
             
             // Deshabilitar el formulario
             document.getElementById('uploadForm').querySelectorAll('input, button').forEach(el => el.disabled = true);
