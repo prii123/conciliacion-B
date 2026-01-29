@@ -57,6 +57,93 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Renderizar movimientos
             renderMovimientos(data.movimientos_no_conciliados, data.movimientos_conciliados);
+
+            // Actualizar totales iniciales
+            updateTotales('banco');
+            updateTotales('auxiliar');
+
+            // Agregar funcionalidad de búsqueda
+            ['banco', 'auxiliar'].forEach(tipo => {
+                const searchInput = document.getElementById(`search-${tipo}`);
+                if (searchInput) {
+                    searchInput.addEventListener('input', () => {
+                        const query = searchInput.value.toLowerCase();
+                        const table = document.getElementById(`${tipo}-movimientos`);
+                        if (table) {
+                            const tbody = table.querySelector('tbody');
+                            if (tbody) {
+                                const rows = tbody.querySelectorAll('tr');
+                                rows.forEach(row => {
+                                    const descripcion = row.cells[3].textContent.toLowerCase(); // Columna de descripción
+                                    if (descripcion.includes(query)) {
+                                        row.style.display = '';
+                                    } else {
+                                        row.style.display = 'none';
+                                    }
+                                });
+                                // Actualizar totales después de filtrar
+                                updateTotales(tipo);
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Para conciliados, filtrar por criterio_match
+            const searchConciliados = document.getElementById('search-conciliados');
+            if (searchConciliados) {
+                searchConciliados.addEventListener('input', () => {
+                    const query = searchConciliados.value.toLowerCase();
+                    const table = document.getElementById('conciliados-movimientos');
+                    if (table) {
+                        const tbody = table.querySelector('tbody');
+                        if (tbody) {
+                            const rows = tbody.querySelectorAll('tr');
+                            rows.forEach(row => {
+                                const criterio = row.cells[4].textContent.toLowerCase(); // Columna de criterio_match
+                                if (criterio.includes(query)) {
+                                    row.style.display = '';
+                                } else {
+                                    row.style.display = 'none';
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
+            // Select all functionality
+            ['banco', 'auxiliar'].forEach(tipo => {
+                const selectAllCheckbox = document.getElementById(`select-all-${tipo}`);
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.addEventListener('change', () => {
+                        const table = document.getElementById(`${tipo}-movimientos`);
+                        if (table) {
+                            const tbody = table.querySelector('tbody');
+                            if (tbody) {
+                                const checkboxes = tbody.querySelectorAll('input.chk-mov');
+                                checkboxes.forEach(checkbox => {
+                                    checkbox.checked = selectAllCheckbox.checked;
+                                    const id = parseInt(checkbox.dataset.id);
+                                    if (selectAllCheckbox.checked) {
+                                        if (tipo === 'banco' && !seleccionBanco.includes(id)) {
+                                            seleccionBanco.push(id);
+                                        } else if (tipo === 'auxiliar' && !seleccionAuxiliar.includes(id)) {
+                                            seleccionAuxiliar.push(id);
+                                        }
+                                    } else {
+                                        if (tipo === 'banco') {
+                                            seleccionBanco = seleccionBanco.filter(item => item !== id);
+                                        } else if (tipo === 'auxiliar') {
+                                            seleccionAuxiliar = seleccionAuxiliar.filter(item => item !== id);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            });
         } catch (error) {
             // console.error("Error al cargar los detalles de la conciliación:", error);
             const container = document.getElementById("conciliaciones-container");
@@ -136,13 +223,60 @@ document.addEventListener('DOMContentLoaded', () => {
         // console.log("Movimientos no conciliados (auxiliar):", movimientosNoConciliados.auxiliar);
         // console.log("Movimientos conciliados:", movimientosConciliados);
 
+        // Recopilar descripciones únicas para filtros predictivos
+        const bancoDescriptions = [...new Set(movimientosNoConciliados.banco.map(m => m.descripcion))];
+        const auxiliarDescriptions = [...new Set(movimientosNoConciliados.auxiliar.map(m => m.descripcion))];
+        const conciliadosCriterios = [...new Set(movimientosConciliados.map(m => m.criterio_match))];
+
         document.getElementById("banco-count").textContent = movimientosNoConciliados.banco.length;
         document.getElementById("auxiliar-count").textContent = movimientosNoConciliados.auxiliar.length;
         document.getElementById("conciliados-count").textContent = movimientosConciliados.length;
 
-        document.getElementById("banco-movimientos").innerHTML = renderMovimientosTable(movimientosNoConciliados.banco, "banco");
-        document.getElementById("auxiliar-movimientos").innerHTML = renderMovimientosTable(movimientosNoConciliados.auxiliar, "auxiliar");
-        document.getElementById("conciliados-movimientos").innerHTML = renderMovimientosTable(movimientosConciliados, "conciliados");
+        document.getElementById("banco-movimientos").innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="select-all-banco">
+                    <label class="form-check-label" for="select-all-banco">
+                        Seleccionar todos
+                    </label>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <input type="text" class="form-control" placeholder="Buscar por descripción en Banco..." id="search-banco" list="descriptions-banco">
+                    <datalist id="descriptions-banco">
+                        ${bancoDescriptions.map(d => `<option value="${d}">`).join('')}
+                    </datalist>
+                </div>
+            </div>
+            ${renderMovimientosTable(movimientosNoConciliados.banco, "banco")}
+            <div id="totales-banco" class="mt-3 text-muted"></div>
+        `;
+        document.getElementById("auxiliar-movimientos").innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="select-all-auxiliar">
+                    <label class="form-check-label" for="select-all-auxiliar">
+                        Seleccionar todos
+                    </label>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <input type="text" class="form-control" placeholder="Buscar por descripción en Auxiliar..." id="search-auxiliar" list="descriptions-auxiliar">
+                    <datalist id="descriptions-auxiliar">
+                        ${auxiliarDescriptions.map(d => `<option value="${d}">`).join('')}
+                    </datalist>
+                </div>
+            </div>
+            ${renderMovimientosTable(movimientosNoConciliados.auxiliar, "auxiliar")}
+            <div id="totales-auxiliar" class="mt-3 text-muted"></div>
+        `;
+        document.getElementById("conciliados-movimientos").innerHTML = `
+            <div class="mb-3">
+                <input type="text" class="form-control" placeholder="Buscar por criterio en Conciliados..." id="search-conciliados" list="criterios-conciliados">
+                <datalist id="criterios-conciliados">
+                    ${conciliadosCriterios.map(c => `<option value="${c}">`).join('')}
+                </datalist>
+            </div>
+            ${renderMovimientosTable(movimientosConciliados, "conciliados")}
+        `;
     };
 
     const renderMovimientosTable = (movimientos, tipo) => {
@@ -391,6 +525,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // console.log('Seleccionados banco:', seleccionBanco);
             // console.log('Seleccionados auxiliar:', seleccionAuxiliar);
+
+            // Update select all state
+            const table = document.getElementById(`${tipo}-movimientos`);
+            if (table) {
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                    const checkboxes = tbody.querySelectorAll('input.chk-mov');
+                    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                    const selectAll = document.getElementById(`select-all-${tipo}`);
+                    if (selectAll) {
+                        selectAll.checked = allChecked;
+                    }
+                }
+            }
         }
     });
 
@@ -464,13 +612,22 @@ function renderConciliacionDetails(data) {
 
         <div class="tab-content">
             <div class="tab-pane fade show active" id="banco" role="tabpanel">
-                ${renderMovimientosTable(data.movimientos_no_conciliados.banco)}
+                <div class="mb-3">
+                    <input type="text" class="form-control" placeholder="Buscar por descripción en Banco..." id="search-banco">
+                </div>
+                ${renderMovimientosTable(data.movimientos_no_conciliados.banco, "banco")}
             </div>
             <div class="tab-pane fade" id="auxiliar" role="tabpanel">
-                ${renderMovimientosTable(data.movimientos_no_conciliados.auxiliar)}
+                <div class="mb-3">
+                    <input type="text" class="form-control" placeholder="Buscar por descripción en Auxiliar..." id="search-auxiliar">
+                </div>
+                ${renderMovimientosTable(data.movimientos_no_conciliados.auxiliar, "auxiliar")}
             </div>
             <div class="tab-pane fade" id="conciliados" role="tabpanel">
-                ${renderMovimientosTable(data.movimientos_conciliados)}
+                <div class="mb-3">
+                    <input type="text" class="form-control" placeholder="Buscar por descripción en Conciliados..." id="search-conciliados">
+                </div>
+                ${renderMovimientosTable(data.movimientos_conciliados, "conciliados")}
             </div>
         </div>
     `;
@@ -533,6 +690,38 @@ const verifyElementExists = (id) => {
     }
     return element;
 };
+
+function calcularTotales(tipo) {
+    const table = document.getElementById(`${tipo}-movimientos`);
+    if (!table) return { totalE: 0, totalS: 0 };
+
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return { totalE: 0, totalS: 0 };
+
+    const rows = tbody.querySelectorAll('tr:not([style*="display: none"])'); // Solo filas visibles
+    let totalE = 0, totalS = 0;
+
+    rows.forEach(row => {
+        const cells = row.cells;
+        if (cells.length > 5) { // Para banco y auxiliar
+            const es = cells[5].textContent.trim(); // Columna Tipo (E/S)
+            const valorText = cells[4].textContent.trim(); // Columna Valor
+            const valor = parseFloat(valorText.replace(/[^0-9.-]/g, '')) || 0;
+            if (es === 'E') totalE += valor;
+            else if (es === 'S') totalS += valor;
+        }
+    });
+
+    return { totalE, totalS };
+}
+
+function updateTotales(tipo) {
+    const { totalE, totalS } = calcularTotales(tipo);
+    const totalesDiv = document.getElementById(`totales-${tipo}`);
+    if (totalesDiv) {
+        totalesDiv.innerHTML = `<strong>Total E: ${totalE.toFixed(2)} | Total S: ${totalS.toFixed(2)}</strong>`;
+    }
+}
 
 const getSelectedMovements = (tableBodyId) => {
     console.log(`Buscando checkboxes seleccionados en el contenedor con ID: ${tableBodyId}`);
