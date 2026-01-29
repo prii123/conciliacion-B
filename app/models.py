@@ -52,6 +52,8 @@ class Conciliacion(Base):
     mes_conciliado = Column(String)
     cuenta_conciliada = Column(String)
     año_conciliado = Column(String)
+    pdf_minio_url = Column(String)  # URL del PDF almacenado en MinIO
+    pdf_minio_key = Column(String)  # Clave del objeto en MinIO
 
     empresa = relationship("Empresa", back_populates="conciliaciones")
     movimientos = relationship("Movimiento", back_populates="conciliacion", cascade="all, delete-orphan")

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ import io, pandas as pd
 import PyPDF2
 import openai
 import os
+import minio
 import pdfplumber
 import asyncio
 import json
@@ -23,6 +24,28 @@ from ..utils.conciliaciones import realizar_conciliacion_automatica, crear_conci
 from ..repositories.factory import RepositoryFactory
 
 router = APIRouter()
+
+# Configuración de MinIO
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000").replace("http://", "").replace("https://", "")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "conciliaciones-pdfs")
+MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
+
+minio_client = minio.Minio(
+    MINIO_ENDPOINT,
+    access_key=MINIO_ACCESS_KEY,
+    secret_key=MINIO_SECRET_KEY,
+    secure=MINIO_SECURE
+)
+
+# Crear bucket si no existe
+try:
+    if not minio_client.bucket_exists(MINIO_BUCKET_NAME):
+        minio_client.make_bucket(MINIO_BUCKET_NAME)
+        print(f"✅ Bucket '{MINIO_BUCKET_NAME}' creado en MinIO")
+except Exception as e:
+    print(f"⚠️ Error al verificar/crear bucket MinIO: {e}")
 
 
 
@@ -66,6 +89,9 @@ def lista_conciliaciones_json(
             'conciliados': conciliados,
             'pendientes': pendientes,
             'porcentaje_conciliacion': porcentaje,
+            'pdf_minio_url': c.pdf_minio_url,
+            'pdf_minio_key': c.pdf_minio_key,
+            'nombre_archivo_banco': c.nombre_archivo_banco,
         }
 
         if empresa not in conciliaciones_por_empresa:
@@ -674,16 +700,17 @@ async def upload_extracto_bancario(
         task = task_repo.create(task_data)
         print(f"✅ Tarea creada: {task.id}")
 
-        # Iniciar procesamiento en segundo plano
+        # Iniciar procesamiento completo en segundo plano (subida a MinIO + DeepSeek)
         background_tasks.add_task(
-            process_and_load_extracto,
+            process_upload_and_deepseek,
             conciliacion_id=conciliacion_id,
-            content=content,
+            file_content=content,
+            filename=file.filename,
             user_id=current_user.id,
             task_id=task.id
         )
 
-        print("✅ Respuesta enviada al cliente, procesamiento continúa en background")
+        print("✅ Respuesta enviada al cliente, procesamiento completo continúa en background")
         return JSONResponse(content={
             "message": "Procesamiento de extracto bancario iniciado en segundo plano. El análisis con DeepSeek y la carga de movimientos puede tardar varios minutos. La página se actualizará automáticamente para mostrar el progreso.",
             "conciliacion_id": conciliacion_id,
@@ -701,7 +728,96 @@ async def upload_extracto_bancario(
         raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 
-async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_id: int, task_id: int):
+async def process_upload_and_deepseek(conciliacion_id: int, file_content: bytes, filename: str, user_id: int, task_id: int):
+    """
+    Función de segundo plano que sube el PDF a MinIO y luego lo procesa con DeepSeek.
+    """
+    from app.database import SessionLocal
+    from app.repositories.factory import RepositoryFactory
+    db = SessionLocal()  # Crear nueva sesión independiente
+
+    try:
+        print(f"🔄 Iniciando procesamiento completo en segundo plano para conciliación #{conciliacion_id}")
+
+        factory = RepositoryFactory(db)
+        task_repo = factory.get_task_repository()
+
+        # Actualizar tarea a processing
+        task_repo.update(task_id, {"estado": "processing", "progreso": 5.0})
+
+        # Verificar conciliación y usuario
+        conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_id).first()
+        if not conciliacion:
+            print(f"❌ Conciliación #{conciliacion_id} no encontrada")
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "Conciliación no encontrada"})
+            return
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            print(f"❌ Usuario #{user_id} no encontrado")
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "Usuario no encontrado"})
+            return
+
+        # Verificar acceso
+        if user.role != 'administrador' and conciliacion.id_usuario_creador != user.id:
+            print(f"❌ Usuario {user.id} no tiene acceso a conciliación #{conciliacion_id}")
+            task_repo.update(task_id, {"estado": "failed", "descripcion": "Acceso denegado"})
+            return
+
+        # PASO 1: Subir PDF a MinIO
+        print("📤 Subiendo PDF a MinIO...")
+        conciliacion.estado = 'subiendo_minio'
+        db.commit()
+        task_repo.update(task_id, {"progreso": 10.0})
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        minio_key = f"conciliacion_{conciliacion_id}_{timestamp}.pdf"
+
+        try:
+            minio_client.put_object(
+                MINIO_BUCKET_NAME,
+                minio_key,
+                io.BytesIO(file_content),
+                len(file_content),
+                content_type="application/pdf"
+            )
+            # Generar URL presigned (válida por 7 días = 604800 segundos)
+            pdf_minio_url = minio_client.presigned_get_object(
+                MINIO_BUCKET_NAME,
+                minio_key,
+                expires=timedelta(seconds=604800)  # 7 días
+            )
+            print(f"✅ PDF subido a MinIO: {pdf_minio_url}")
+
+            # Guardar solo la clave en la base de datos (no la URL que expira)
+            conciliacion.pdf_minio_key = minio_key
+            conciliacion.nombre_archivo_banco = filename
+            db.commit()
+            print("✅ Clave de MinIO guardada en base de datos")
+
+        except Exception as e:
+            print(f"❌ Error al subir PDF a MinIO: {str(e)}")
+            conciliacion.estado = 'error_subida_minio'
+            db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": f"Error al subir a MinIO: {str(e)}"})
+            return
+
+        # PASO 2: Procesar con DeepSeek (usando la función existente)
+        await process_and_load_extracto(conciliacion_id, pdf_minio_url, user_id, task_id)
+
+    except Exception as e:
+        print(f"❌ Error inesperado en process_upload_and_deepseek: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        try:
+            task_repo.update(task_id, {"estado": "failed", "descripcion": f"Error interno: {str(e)}"})
+        except:
+            pass
+    finally:
+        db.close()
+
+
+async def process_and_load_extracto(conciliacion_id: int, pdf_minio_url: str, user_id: int, task_id: int):
     """
     Función de segundo plano que procesa el PDF con DeepSeek y carga los movimientos en la BD.
     """
@@ -743,10 +859,23 @@ async def process_and_load_extracto(conciliacion_id: int, content: bytes, user_i
         print(f"📝 Estado inicial establecido: procesando_extracto")
         task_repo.update(task_id, {"progreso": 10.0})
 
-        print("📄 Extrayendo texto del PDF...")
-        conciliacion.estado = 'extrayendo_texto'
-        db.commit()
-        task_repo.update(task_id, {"progreso": 20.0})
+        print("📄 Descargando PDF desde MinIO...")
+        # Parsear URL de MinIO para obtener bucket y key
+        from urllib.parse import urlparse
+        parsed_url = urlparse(pdf_minio_url)
+        bucket_name = parsed_url.path.split('/')[1]
+        minio_key = '/'.join(parsed_url.path.split('/')[2:])
+        
+        try:
+            response = minio_client.get_object(bucket_name, minio_key)
+            content = response.read()
+            print(f"✅ PDF descargado desde MinIO: {len(content)} bytes")
+        except Exception as e:
+            print(f"❌ Error descargando PDF desde MinIO: {str(e)}")
+            conciliacion.estado = 'error_descarga_minio'
+            db.commit()
+            task_repo.update(task_id, {"estado": "failed", "descripcion": f"Error descargando PDF: {str(e)}"})
+            return
 
         # Extraer texto del PDF (igual que antes)
         text_pages = []
@@ -2098,3 +2227,53 @@ def get_task_details(
             "pending_groups": len([r for r in processing_results if r.status == 'pending'])
         }
     })
+
+@router.get("/{conciliacion_id}/pdf")
+def get_conciliacion_pdf_url(
+    conciliacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Genera una URL presigned para acceder al PDF de una conciliación almacenado en MinIO
+    """
+    factory = RepositoryFactory(db)
+    conciliacion_repo = factory.get_conciliacion_repository()
+
+    # Verificar que la conciliación existe y pertenece al usuario
+    conciliacion = conciliacion_repo.get_by_id(conciliacion_id)
+    if not conciliacion:
+        raise HTTPException(status_code=404, detail="Conciliación no encontrada")
+
+    # Verificar permisos de acceso
+    if current_user.role != 'administrador' and conciliacion.id_usuario_creador != current_user.id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder a esta conciliación")
+
+    # Verificar que hay un archivo PDF
+    if not conciliacion.pdf_minio_key and not conciliacion.nombre_archivo_banco:
+        raise HTTPException(status_code=404, detail="No hay archivo PDF asociado a esta conciliación")
+
+    try:
+        # Usar la clave guardada en la base de datos, o intentar generar una para conciliaciones antiguas
+        if conciliacion.pdf_minio_key:
+            minio_key = conciliacion.pdf_minio_key
+        else:
+            # Para conciliaciones antiguas, intentar con el patrón anterior
+            # Esto es un fallback y puede no funcionar para todos los casos
+            minio_key = f"conciliacion_{conciliacion_id}_{conciliacion.nombre_archivo_banco}"
+
+        # Generar URL presigned válida por 1 hora
+        presigned_url = minio_client.presigned_get_object(
+            MINIO_BUCKET_NAME,
+            minio_key,
+            expires=timedelta(seconds=3600)  # 1 hora
+        )
+
+        return JSONResponse(content={
+            "pdf_url": presigned_url,
+            "expires_in": "1 hora"
+        })
+
+    except Exception as e:
+        print(f"❌ Error al generar URL presigned para PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al generar enlace de acceso al PDF")

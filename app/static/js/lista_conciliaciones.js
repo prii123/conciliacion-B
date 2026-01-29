@@ -129,6 +129,11 @@ function renderConciliaciones(conciliaciones, empresaId) {
                 <button class="btn btn-sm btn-outline-success" onclick="generarInforme(${c.id})">
                     <i class="bi bi-file-earmark-pdf"></i> Informe
                 </button>
+                ${c.pdf_minio_key ? `
+                <button class="btn btn-sm btn-outline-primary" onclick="verPDFOriginal(${c.id})" title="Ver extracto bancario PDF">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Extracto
+                </button>
+                ` : ''}
             </td>
         </tr>
     `).join("");
@@ -190,6 +195,114 @@ window.generarInforme = async function (conciliacionId) {
         alert("Hubo un error al generar el informe. Por favor, inténtelo de nuevo más tarde.");
     }
 };
+
+// Función para ver el PDF original de la conciliación
+window.verPDFOriginal = async function (conciliacionId) {
+    try {
+        const response = await Auth.get(`${window.API_BASE_URL}/api/conciliaciones/${conciliacionId}/pdf`);
+        
+        if (!response.pdf_url) {
+            throw new Error("No se pudo obtener la URL del PDF");
+        }
+        
+        // Mostrar el PDF en un modal en lugar de nueva pestaña
+        mostrarModalPDF(response.pdf_url, conciliacionId);
+    } catch (error) {
+        console.error("Error al obtener el PDF:", error);
+        if (error.status === 404) {
+            alert("No se encontró el extracto bancario PDF para esta conciliación.");
+        } else if (error.status === 403) {
+            alert("No tienes permisos para acceder a este archivo.");
+        } else {
+            alert("Hubo un error al acceder al extracto bancario. Por favor, inténtelo de nuevo más tarde.");
+        }
+    }
+};
+
+// Función para mostrar el modal con el PDF
+function mostrarModalPDF(pdfUrl, conciliacionId) {
+    // Crear el modal si no existe
+    let modal = document.getElementById('pdfModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'pdfModal';
+        modal.className = 'modal fade';
+        modal.setAttribute('tabindex', '-1');
+        modal.innerHTML = `
+            <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
+                <div class="modal-content" style="height: 90vh;">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>
+                            Extracto Bancario - Conciliación #${conciliacionId}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <iframe id="pdfViewer" 
+                                src="${pdfUrl}" 
+                                style="width: 100%; height: 100%; border: none;" 
+                                title="Extracto Bancario PDF">
+                            <p>Tu navegador no soporta iframes. 
+                               <a href="${pdfUrl}" target="_blank">Haz clic aquí para ver el PDF</a>
+                            </p>
+                        </iframe>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle me-2"></i>Cerrar
+                        </button>
+                      
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Agregar estilos CSS para el modal
+        const style = document.createElement('style');
+        style.textContent = `
+            #pdfModal .modal-content {
+                height: 90vh !important;
+            }
+            #pdfModal .modal-body {
+                flex: 1;
+                overflow: hidden;
+            }
+            #pdfModal iframe {
+                width: 100% !important;
+                height: 100% !important;
+                border: none !important;
+            }
+            @media (max-width: 991.98px) {
+                #pdfModal .modal-dialog {
+                    margin: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    max-width: none;
+                }
+                #pdfModal .modal-content {
+                    height: 100vh !important;
+                    border-radius: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    } else {
+        // Actualizar el contenido del modal existente
+        const iframe = modal.querySelector('#pdfViewer');
+        const title = modal.querySelector('.modal-title');
+        const newTabLink = modal.querySelector('.btn-primary');
+        
+        iframe.src = pdfUrl;
+        title.innerHTML = `<i class="bi bi-file-earmark-pdf me-2"></i>Extracto Bancario - Conciliación #${conciliacionId}`;
+        newTabLink.href = pdfUrl;
+    }
+    
+    // Mostrar el modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
 
 // Función para aplicar filtros
 window.aplicarFiltros = function(empresaId) {

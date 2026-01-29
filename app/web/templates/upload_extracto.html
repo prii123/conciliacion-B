@@ -174,8 +174,16 @@ input[type="file"] {
                     {% endif %}
                 </div>
                 <div class="card-body">
-                    {% if conciliacion.estado == 'procesando_extracto' or conciliacion.estado == 'extrayendo_texto' or conciliacion.estado == 'configurando_deepseek' or conciliacion.estado == 'procesando_deepseek' or conciliacion.estado == 'cargando_movimientos' %}
-                    {% if conciliacion.estado == 'extrayendo_texto' %}
+                    {% if conciliacion.estado == 'procesando_extracto' or conciliacion.estado == 'extrayendo_texto' or conciliacion.estado == 'configurando_deepseek' or conciliacion.estado == 'procesando_deepseek' or conciliacion.estado == 'cargando_movimientos' or conciliacion.estado == 'subiendo_minio' %}
+                    {% if conciliacion.estado == 'subiendo_minio' %}
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-cloud-upload me-2"></i>Subiendo a Almacenamiento</h5>
+                        <p>Guardando el PDF en el servidor de archivos seguro...</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 15%"></div>
+                        </div>
+                    </div>
+                    {% elif conciliacion.estado == 'extrayendo_texto' %}
                     <div class="alert alert-info">
                         <h5><i class="bi bi-file-earmark-text me-2"></i>Extrayendo Texto del PDF</h5>
                         <p>Analizando el contenido del archivo PDF...</p>
@@ -230,7 +238,7 @@ input[type="file"] {
                                 if (response.ok) {
                                     const html = await response.text();
                                     // Si el estado cambió, recargar la página
-                                    if (!html.includes('procesando_extracto') && !html.includes('extrayendo_texto') && !html.includes('configurando_deepseek') && !html.includes('procesando_deepseek') && !html.includes('cargando_movimientos')) {
+                                    if (!html.includes('procesando_extracto') && !html.includes('extrayendo_texto') && !html.includes('configurando_deepseek') && !html.includes('procesando_deepseek') && !html.includes('cargando_movimientos') && !html.includes('subiendo_minio')) {
                                         location.reload();
                                     }
                                 }
