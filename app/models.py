@@ -109,8 +109,8 @@ class ConciliacionManual(Base):
     fecha_creacion = Column(String, default=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     # Relaciones con movimientos
-    movimientos_banco = relationship("Movimiento", secondary="conciliacion_manual_banco")
-    movimientos_auxiliar = relationship("Movimiento", secondary="conciliacion_manual_auxiliar")
+    movimientos_banco = relationship("Movimiento", secondary="conciliacion_manual_banco", cascade="all")
+    movimientos_auxiliar = relationship("Movimiento", secondary="conciliacion_manual_auxiliar", cascade="all")
 
 class ConciliacionManualBanco(Base):
     __tablename__ = 'conciliacion_manual_banco'

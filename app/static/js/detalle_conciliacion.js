@@ -64,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Actualizar totales iniciales
             updateTotales('banco');
             updateTotales('auxiliar');
+            updateSelectAllState('banco');
+            updateSelectAllState('auxiliar');
 
             // Agregar funcionalidad de búsqueda
             ['banco', 'auxiliar'].forEach(tipo => {
@@ -84,8 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                         row.style.display = 'none';
                                     }
                                 });
-                                // Actualizar totales después de filtrar
+                                // Actualizar totales y estado del select all después de filtrar
                                 updateTotales(tipo);
+                                updateSelectAllState(tipo);
                             }
                         }
                     });
@@ -124,7 +127,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (table) {
                             const tbody = table.querySelector('tbody');
                             if (tbody) {
-                                const checkboxes = tbody.querySelectorAll('input.chk-mov');
+                                // Solo seleccionar checkboxes de filas visibles (no filtradas)
+                                const visibleRows = tbody.querySelectorAll('tr:not([style*="display: none"])');
+                                const checkboxes = [];
+                                
+                                visibleRows.forEach(row => {
+                                    const checkbox = row.querySelector('input.chk-mov');
+                                    if (checkbox) {
+                                        checkboxes.push(checkbox);
+                                    }
+                                });
+                                
                                 checkboxes.forEach(checkbox => {
                                     checkbox.checked = selectAllCheckbox.checked;
                                     const id = parseInt(checkbox.dataset.id);
@@ -142,6 +155,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                         }
                                     }
                                 });
+                                
+                                // Update totals when select all changes
+                                updateTotales(tipo);
                             }
                         }
                     });
@@ -529,19 +545,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // console.log('Seleccionados banco:', seleccionBanco);
             // console.log('Seleccionados auxiliar:', seleccionAuxiliar);
 
-            // Update select all state
-            const table = document.getElementById(`${tipo}-movimientos`);
-            if (table) {
-                const tbody = table.querySelector('tbody');
-                if (tbody) {
-                    const checkboxes = tbody.querySelectorAll('input.chk-mov');
-                    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-                    const selectAll = document.getElementById(`select-all-${tipo}`);
-                    if (selectAll) {
-                        selectAll.checked = allChecked;
-                    }
-                }
-            }
+            // Update select all state (solo considerar checkboxes visibles)
+            updateSelectAllState(tipo);
+
+            // Update totals when checkbox state changes
+            updateTotales(tipo);
         }
     });
 
@@ -694,6 +702,31 @@ const verifyElementExists = (id) => {
     return element;
 };
 
+// Función helper para actualizar el estado del select all
+function updateSelectAllState(tipo) {
+    const table = document.getElementById(`${tipo}-movimientos`);
+    if (table) {
+        const tbody = table.querySelector('tbody');
+        if (tbody) {
+            const visibleRows = tbody.querySelectorAll('tr:not([style*="display: none"])');
+            const visibleCheckboxes = [];
+            
+            visibleRows.forEach(row => {
+                const checkbox = row.querySelector('input.chk-mov');
+                if (checkbox) {
+                    visibleCheckboxes.push(checkbox);
+                }
+            });
+            
+            const allVisibleChecked = visibleCheckboxes.length > 0 && visibleCheckboxes.every(cb => cb.checked);
+            const selectAll = document.getElementById(`select-all-${tipo}`);
+            if (selectAll) {
+                selectAll.checked = allVisibleChecked;
+            }
+        }
+    }
+}
+
 function calcularTotales(tipo) {
     const table = document.getElementById(`${tipo}-movimientos`);
     if (!table) return { totalE: 0, totalS: 0 };
@@ -701,17 +734,24 @@ function calcularTotales(tipo) {
     const tbody = table.querySelector('tbody');
     if (!tbody) return { totalE: 0, totalS: 0 };
 
-    const rows = tbody.querySelectorAll('tr:not([style*="display: none"])'); // Solo filas visibles
+    // Solo filas visibles que tienen checkbox marcado
+    const rows = tbody.querySelectorAll('tr:not([style*="display: none"])');
     let totalE = 0, totalS = 0;
 
     rows.forEach(row => {
         const cells = row.cells;
         if (cells.length > 5) { // Para banco y auxiliar
-            const es = cells[5].textContent.trim(); // Columna Tipo (E/S)
-            const valorText = cells[4].textContent.trim(); // Columna Valor
-            const valor = parseFloat(valorText.replace(/[^0-9.-]/g, '')) || 0;
-            if (es === 'E') totalE += valor;
-            else if (es === 'S') totalS += valor;
+            // Verificar si el checkbox está marcado
+            const checkbox = cells[0].querySelector('input.chk-mov');
+            if (checkbox && checkbox.checked) {
+                const es = cells[5].textContent.trim(); // Columna Tipo (E/S)
+                const valorText = cells[4].textContent.trim(); // Columna Valor
+                // Convertir formato colombiano (1.234.567,89) a formato parseable (1234567.89)
+                const valorParseable = valorText.replace(/\./g, '').replace(',', '.');
+                const valor = parseFloat(valorParseable) || 0;
+                if (es === 'E') totalE += valor;
+                else if (es === 'S') totalS += valor;
+            }
         }
     });
 

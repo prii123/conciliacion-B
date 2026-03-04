@@ -104,6 +104,11 @@ function renderMatchesAndManuals(data) {
                             <i class="bi bi-calendar3 me-1"></i>${manual.fecha_creacion}
                         </small>
                     </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarConciliacionManual(${manual.id_conciliacion_manual})">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
@@ -158,6 +163,27 @@ function renderMovimientos(movimientos) {
             </div>
         </div>
     `;
+}
+
+// Función para eliminar conciliación manual
+async function eliminarConciliacionManual(manualId) {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta conciliación manual? Esta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    try {
+        const conciliacionId = document.getElementById("matches-container").dataset.conciliacionId;
+        await Auth.delete(`${window.API_BASE_URL}/api/conciliaciones/conciliacion_manual/${manualId}/eliminar`);
+        
+        // Mostrar mensaje de éxito
+        alert('Conciliación manual eliminada exitosamente.');
+        
+        // Refrescar los datos
+        fetchMatchesAndManuals(conciliacionId);
+    } catch (error) {
+        console.error("Error eliminando conciliación manual:", error);
+        alert('Error al eliminar la conciliación manual. Por favor, intenta de nuevo.');
+    }
 }
 
 // Fetch data on page load

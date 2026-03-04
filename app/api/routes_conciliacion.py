@@ -612,17 +612,7 @@ def eliminar_conciliacion(
     # Eliminar conciliaciones manuales y sus relaciones
     conciliaciones_manuales = db.query(ConciliacionManual).filter(ConciliacionManual.id_conciliacion == conciliacion_id).all()
     for cm in conciliaciones_manuales:
-        # Eliminar relaciones banco
-        relaciones_banco = db.query(ConciliacionManualBanco).filter(ConciliacionManualBanco.id_conciliacion_manual == cm.id).all()
-        for rel in relaciones_banco:
-            db.delete(rel)
-        
-        # Eliminar relaciones auxiliar
-        relaciones_auxiliar = db.query(ConciliacionManualAuxiliar).filter(ConciliacionManualAuxiliar.id_conciliacion_manual == cm.id).all()
-        for rel in relaciones_auxiliar:
-            db.delete(rel)
-        
-        # Eliminar conciliación manual
+        # Las relaciones se eliminarán automáticamente por cascade
         db.delete(cm)
     
     # Eliminar movimientos
@@ -646,6 +636,53 @@ def eliminar_conciliacion(
     
     db.commit()
     return {"message": f"Conciliación #{conciliacion_id} y todos sus datos asociados eliminados con éxito."}
+
+
+@router.delete("/conciliacion_manual/{manual_id}/eliminar")
+def eliminar_conciliacion_manual(
+    manual_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Elimina una conciliación manual específica junto con sus relaciones.
+    """
+    print(f"Eliminando conciliación manual #{manual_id}...")
+    
+    # Obtener la conciliación manual
+    conciliacion_manual = db.query(ConciliacionManual).filter(ConciliacionManual.id == manual_id).first()
+    if not conciliacion_manual:
+        raise HTTPException(404, "Conciliación manual no encontrada")
+    
+    # Verificar acceso a la conciliación padre
+    conciliacion = db.query(Conciliacion).filter(Conciliacion.id == conciliacion_manual.id_conciliacion).first()
+    if not conciliacion:
+        raise HTTPException(404, "Conciliación padre no encontrada")
+    
+    if current_user.role != 'administrador' and conciliacion.id_usuario_creador != current_user.id:
+        raise HTTPException(403, "No tienes permiso para modificar esta conciliación")
+    
+    # Obtener movimientos involucrados para cambiar su estado antes de eliminar las relaciones
+    relaciones_banco = db.query(ConciliacionManualBanco).filter(ConciliacionManualBanco.id_conciliacion_manual == manual_id).all()
+    relaciones_auxiliar = db.query(ConciliacionManualAuxiliar).filter(ConciliacionManualAuxiliar.id_conciliacion_manual == manual_id).all()
+    
+    # Cambiar estado de movimientos banco a 'no_conciliado'
+    for rel in relaciones_banco:
+        movimiento = db.query(Movimiento).filter(Movimiento.id == rel.id_movimiento_banco).first()
+        if movimiento:
+            movimiento.estado_conciliacion = 'no_conciliado'
+    
+    # Cambiar estado de movimientos auxiliar a 'no_conciliado'
+    for rel in relaciones_auxiliar:
+        movimiento = db.query(Movimiento).filter(Movimiento.id == rel.id_movimiento_auxiliar).first()
+        if movimiento:
+            movimiento.estado_conciliacion = 'no_conciliado'
+    
+    # Eliminar conciliación manual (las relaciones se eliminarán automáticamente por cascade)
+    db.delete(conciliacion_manual)
+    
+    db.commit()
+    return {"message": f"Conciliación manual #{manual_id} eliminada con éxito."}
 
 
 @router.post("/upload-extracto/{conciliacion_id}")
