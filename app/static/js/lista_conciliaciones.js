@@ -221,46 +221,57 @@ window.verPDFOriginal = async function (conciliacionId) {
 
 // Función para mostrar el modal con el PDF
 function mostrarModalPDF(pdfUrl, conciliacionId) {
-    // Crear el modal si no existe
-    let modal = document.getElementById('pdfModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'pdfModal';
-        modal.className = 'modal fade';
-        modal.setAttribute('tabindex', '-1');
-        modal.innerHTML = `
-            <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
-                <div class="modal-content" style="height: 90vh;">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="bi bi-file-earmark-pdf me-2"></i>
-                            Extracto Bancario - Conciliación #${conciliacionId}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                    </div>
-                    <div class="modal-body p-0">
-                        <iframe id="pdfViewer" 
-                                src="${pdfUrl}" 
-                                style="width: 100%; height: 100%; border: none;" 
-                                title="Extracto Bancario PDF">
-                            <p>Tu navegador no soporta iframes. 
-                               <a href="${pdfUrl}" target="_blank">Haz clic aquí para ver el PDF</a>
-                            </p>
-                        </iframe>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i class="bi bi-x-circle me-2"></i>Cerrar
-                        </button>
-                      
-                    </div>
+    // Remover el modal existente si hay uno
+    const existingModal = document.getElementById('pdfModal');
+    if (existingModal) {
+        // Disponer el modal existente
+        const bsModal = bootstrap.Modal.getInstance(existingModal);
+        if (bsModal) {
+            bsModal.dispose();
+        }
+        existingModal.remove();
+    }
+
+    // Crear un nuevo modal
+    const modal = document.createElement('div');
+    modal.id = 'pdfModal';
+    modal.className = 'modal fade';
+    modal.setAttribute('tabindex', '-1');
+    modal.innerHTML = `
+        <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
+            <div class="modal-content" style="height: 90vh;">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>
+                        Extracto Bancario - Conciliación #${conciliacionId}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <iframe id="pdfViewer" 
+                            src="${pdfUrl}" 
+                            style="width: 100%; height: 100%; border: none;" 
+                            title="Extracto Bancario PDF">
+                        <p>Tu navegador no soporta iframes. 
+                           <a href="${pdfUrl}" target="_blank">Haz clic aquí para ver el PDF</a>
+                        </p>
+                    </iframe>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cerrar
+                    </button>
+                  
                 </div>
             </div>
-        `;
-        document.body.appendChild(modal);
-        
-        // Agregar estilos CSS para el modal
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Agregar estilos CSS para el modal (solo si no existen)
+    if (!document.getElementById('pdfModalStyles')) {
         const style = document.createElement('style');
+        style.id = 'pdfModalStyles';
         style.textContent = `
             #pdfModal .modal-content {
                 height: 90vh !important;
@@ -288,17 +299,8 @@ function mostrarModalPDF(pdfUrl, conciliacionId) {
             }
         `;
         document.head.appendChild(style);
-    } else {
-        // Actualizar el contenido del modal existente
-        const iframe = modal.querySelector('#pdfViewer');
-        const title = modal.querySelector('.modal-title');
-        const newTabLink = modal.querySelector('.btn-primary');
-        
-        iframe.src = pdfUrl;
-        title.innerHTML = `<i class="bi bi-file-earmark-pdf me-2"></i>Extracto Bancario - Conciliación #${conciliacionId}`;
-        newTabLink.href = pdfUrl;
     }
-    
+
     // Mostrar el modal
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
