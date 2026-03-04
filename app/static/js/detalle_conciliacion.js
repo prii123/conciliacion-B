@@ -10,6 +10,9 @@ const conciliacionId = document.body.dataset.conciliacionId;
 // console.log('Datos de movimientos auxiliar:', movimientosAuxiliarData);
 // console.log('ID de conciliación:', conciliacionId);
 
+// Formateador de numero COP (sin simbolo de moneda)
+const numberFormatter = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 
 // =============================
 // ESTADO DE SELECCIÓN
@@ -297,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td>${mov.id_movimiento_auxiliar}</td>
                         <td>${mov.fecha_match}</td>
                         <td>${mov.criterio_match}</td>
-                        <td>${mov.diferencia_valor}</td>
+                        <td>${numberFormatter.format(mov.diferencia_valor)}</td>
                     </tr>
                 `;
             } else {
@@ -307,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td>${mov.id}</td>
                         <td>${mov.fecha}</td>
                         <td>${mov.descripcion}</td>
-                        <td>${mov.valor}</td>
+                        <td>${numberFormatter.format(mov.valor)}</td>
                         <td>${mov.es}</td>
                         <td>${mov.tipo}</td>
                     </tr>
@@ -652,7 +655,7 @@ function renderMovimientosTable(movimientos) {
                 <td>${mov.id}</td>
                 <td>${mov.fecha}</td>
                 <td>${mov.descripcion}</td>
-                <td>${mov.valor}</td>
+                <td>${numberFormatter.format(mov.valor)}</td>
                 <td>${mov.es}</td>
                 <td>${mov.tipo}</td>
             </tr>
@@ -719,7 +722,7 @@ function updateTotales(tipo) {
     const { totalE, totalS } = calcularTotales(tipo);
     const totalesDiv = document.getElementById(`totales-${tipo}`);
     if (totalesDiv) {
-        totalesDiv.innerHTML = `<strong>Total E: ${totalE.toFixed(2)} | Total S: ${totalS.toFixed(2)}</strong>`;
+        totalesDiv.innerHTML = `<strong>Total E: ${numberFormatter.format(totalE)} | Total S: ${numberFormatter.format(totalS)}</strong>`;
     }
 }
 

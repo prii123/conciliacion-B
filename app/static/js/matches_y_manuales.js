@@ -12,6 +12,9 @@ async function fetchMatchesAndManuals(conciliacionId) {
     }
 }
 
+// Formateador de numero (separado por puntos)
+const numberFormatter = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 function renderStats(stats) {
     document.getElementById("total-matches").textContent = stats.total_matches;
     document.getElementById("exact-matches").textContent = stats.exact_matches;
@@ -70,6 +73,21 @@ function renderMatchesAndManuals(data) {
         const manualsSection = document.createElement("div");
         manualsSection.innerHTML = `<h3>Conciliaciones Manuales</h3>`;
         data.conciliaciones_manuales.forEach(manual => {
+            // Calcular totales
+            let totalBanco = 0;
+            if (Array.isArray(manual.movimientos_banco)) {
+                totalBanco = manual.movimientos_banco.reduce((sum, mov) => sum + parseFloat(mov.valor || 0), 0);
+            } else {
+                totalBanco = parseFloat(manual.movimientos_banco.valor || 0);
+            }
+            let totalAuxiliar = 0;
+            if (Array.isArray(manual.movimientos_auxiliar)) {
+                totalAuxiliar = manual.movimientos_auxiliar.reduce((sum, mov) => sum + parseFloat(mov.valor || 0), 0);
+            } else {
+                totalAuxiliar = parseFloat(manual.movimientos_auxiliar.valor || 0);
+            }
+            const diferencia = totalBanco - totalAuxiliar;
+
             const manualDiv = document.createElement("div");
             manualDiv.className = "match-card manual";
             manualDiv.dataset.criterio = "manual";
@@ -101,6 +119,13 @@ function renderMatchesAndManuals(data) {
                         </div>
                     </div>
                 </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            <strong>Total Banco: ${numberFormatter.format(totalBanco)} | Total Auxiliar: ${numberFormatter.format(totalAuxiliar)} | Diferencia: ${numberFormatter.format(diferencia)}</strong>
+                        </div>
+                    </div>
+                </div>
             `;
             manualsSection.appendChild(manualDiv);
         });
@@ -115,7 +140,7 @@ function renderMovimientos(movimientos) {
                 <div class="card-body">
                     <p><strong>ID:</strong> ${mov.id}</p>
                     <p><strong>Fecha:</strong> ${mov.fecha}</p>
-                    <p><strong>Valor:</strong> ${mov.valor}</p>
+                    <p><strong>Valor:</strong> ${numberFormatter.format(mov.valor)}</p>
                     <p><strong>Tipo:</strong> ${mov.tipo}</p>
                     <p><strong>Descripción:</strong> ${mov.descripcion}</p>
                 </div>
@@ -127,7 +152,7 @@ function renderMovimientos(movimientos) {
             <div class="card-body">
                 <p><strong>ID:</strong> ${movimientos.id}</p>
                 <p><strong>Fecha:</strong> ${movimientos.fecha}</p>
-                <p><strong>Valor:</strong> ${movimientos.valor}</p>
+                <p><strong>Valor:</strong> ${numberFormatter.format(movimientos.valor)}</p>
                 <p><strong>Tipo:</strong> ${movimientos.tipo}</p>
                 <p><strong>Descripción:</strong> ${movimientos.descripcion}</p>
             </div>
